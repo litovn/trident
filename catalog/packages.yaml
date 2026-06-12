@@ -1,0 +1,128 @@
+# TRIDENT — Attack packages (curated bundles of catalog techniques)
+# Schema v0.3. English. Target-agnostic.
+# A package = a curated list of technique IDs + safe limits + which modes it runs in.
+# The matcher resolves a user prompt to a package (package-first) or to individual techniques.
+# Layer-selection rule {1 OR all 3, never 2} lives in the scope/selection logic, not here.
+#
+# package fields:
+#   id, name, axis, aliases, intent_examples, techniques[], limits{max_intensity, query_budget}, modes[]
+catalog_version: 0.3
+
+packages:
+
+  # ---------- AXIS: PROFILES (one-click defaults) ----------
+  - id: PKG-QUICK
+    name: "Quick scan"
+    axis: profile
+    aliases: ["quick scan", "fast check", "smoke test"]
+    intent_examples: ["give it a quick check", "fast scan", "light test without going deep"]
+    techniques: [TRD-PRM-001, TRD-PRM-002, TRD-APP-002, TRD-MOD-001]
+    limits: { max_intensity: moderate, query_budget: 50 }
+    modes: [recon, attack]
+
+  - id: PKG-OWASP
+    name: "OWASP LLM sweep"
+    axis: profile
+    aliases: ["owasp sweep", "owasp llm top 10", "cover the owasp risks"]
+    intent_examples: ["cover all OWASP risks", "sweep the OWASP LLM Top 10", "test the standard categories"]
+    techniques: [TRD-PRM-002, TRD-PRM-001, TRD-APP-001, TRD-APP-002, TRD-APP-003, TRD-APP-004, TRD-MOD-003]
+    limits: { max_intensity: moderate, query_budget: 150 }
+    modes: [recon, attack]
+
+  - id: PKG-ATLAS
+    name: "ATLAS kill-chain"
+    axis: profile
+    aliases: ["atlas kill-chain", "full attack chain", "end-to-end attack"]
+    intent_examples: ["simulate a complete attack", "kill-chain from recon to exfil", "chain techniques like a real attacker"]
+    techniques: [TRD-MOD-001, TRD-PRM-002, TRD-APP-001, TRD-APP-002]   # Discovery -> Execution -> Persistence -> Exfiltration
+    limits: { max_intensity: difficult, query_budget: 200 }
+    modes: [recon, attack]
+
+  - id: PKG-360
+    name: "Full 360"
+    axis: profile
+    aliases: ["full 360", "everything", "exhaustive test", "total coverage"]
+    intent_examples: ["exhaustive test", "run everything", "full 360 coverage"]
+    # All targetable, non-deferred techniques across the three layers.
+    # Deferred-mvp (TRD-MOD-004/005/006) are excluded by default (cumulative scorer is post-MVP).
+    techniques: [TRD-PRM-001, TRD-PRM-002, TRD-PRM-003, TRD-PRM-004, TRD-PRM-R01,
+                 TRD-APP-001, TRD-APP-002, TRD-APP-003, TRD-APP-004, TRD-APP-005,
+                 TRD-APP-006, TRD-APP-007, TRD-APP-008, TRD-APP-R01,
+                 TRD-MOD-001, TRD-MOD-002, TRD-MOD-003]
+    limits: { max_intensity: difficult, query_budget: 400 }
+    modes: [recon, attack]
+
+  # ---------- AXIS: PER-LAYER (single-layer option; rule {1 or 3}) ----------
+  - id: PKG-PROMPT
+    name: "Prompt layer only"
+    axis: layer
+    aliases: ["prompt only", "prompt layer", "test the chatbot prompt"]
+    intent_examples: ["only test the prompt layer", "attack just the chatbot input"]
+    techniques: [TRD-PRM-001, TRD-PRM-002, TRD-PRM-003, TRD-PRM-004, TRD-PRM-R01]
+    limits: { max_intensity: difficult, query_budget: 150 }
+    modes: [recon, attack]
+
+  - id: PKG-APP
+    name: "Application layer only"
+    axis: layer
+    aliases: ["application only", "app layer", "rag and tools"]
+    intent_examples: ["only test the application layer", "attack the RAG and tools"]
+    techniques: [TRD-APP-001, TRD-APP-002, TRD-APP-003, TRD-APP-004, TRD-APP-005,
+                 TRD-APP-006, TRD-APP-007, TRD-APP-008, TRD-APP-R01]
+    limits: { max_intensity: difficult, query_budget: 250 }
+    modes: [recon, attack]
+
+  - id: PKG-MODEL
+    name: "Model layer only"
+    axis: layer
+    aliases: ["model only", "model layer", "test the underlying model"]
+    intent_examples: ["only test the model layer", "attack the underlying model"]
+    techniques: [TRD-MOD-001, TRD-MOD-002, TRD-MOD-003, TRD-MOD-004, TRD-MOD-005, TRD-MOD-006]
+    limits: { max_intensity: difficult, query_budget: 300 }
+    modes: [recon, attack]
+
+  # ---------- AXIS: PER-FOCUS (intent-themed bundles) ----------
+  - id: PKG-GUARDRAIL
+    name: "Guardrail bypass"
+    axis: focus
+    aliases: ["guardrail bypass", "jailbreak", "evade safety", "break the guardrails"]
+    intent_examples: ["bypass the guardrails", "jailbreak and evade safety", "get past the content filter"]
+    techniques: [TRD-PRM-002, TRD-PRM-003, TRD-PRM-004, TRD-PRM-001]
+    limits: { max_intensity: difficult, query_budget: 150 }
+    modes: [recon, attack]
+
+  - id: PKG-EXFIL
+    name: "Data exfiltration"
+    axis: focus
+    aliases: ["data exfiltration", "data leakage", "steal data", "exfil"]
+    intent_examples: ["exfiltrate sensitive data", "make it leak data", "data leakage across the stack"]
+    techniques: [TRD-PRM-001, TRD-APP-002, TRD-APP-006, TRD-APP-007, TRD-MOD-002]
+    limits: { max_intensity: difficult, query_budget: 200 }
+    modes: [recon, attack]
+
+  - id: PKG-RAG
+    name: "RAG security"
+    axis: focus
+    aliases: ["rag security", "knowledge base attacks", "retrieval security"]
+    intent_examples: ["test the RAG security", "attacks on the knowledge base", "retrieval pipeline weaknesses"]
+    techniques: [TRD-APP-001, TRD-APP-007, TRD-APP-R01]
+    limits: { max_intensity: difficult, query_budget: 150 }
+    modes: [recon, attack]
+
+  - id: PKG-AGENTIC
+    name: "Agentic / tool abuse"
+    axis: focus
+    aliases: ["agentic abuse", "tool abuse", "agent tools", "mcp"]
+    intent_examples: ["abuse the agent tools", "agentic attacks", "tool invocation abuse"]
+    techniques: [TRD-APP-004, TRD-APP-005, TRD-APP-006, TRD-APP-008]
+    limits: { max_intensity: difficult, query_budget: 200 }
+    modes: [recon, attack]
+
+  - id: PKG-RECON
+    name: "Recon only"
+    axis: focus
+    aliases: ["recon only", "reconnaissance", "map the surface", "non-intrusive"]
+    intent_examples: ["just do recon", "map the attack surface without exploiting", "non-intrusive reconnaissance"]
+    techniques: [TRD-PRM-R01, TRD-APP-R01, TRD-MOD-001]
+    limits: { max_intensity: easy, query_budget: 60 }
+    modes: [recon]

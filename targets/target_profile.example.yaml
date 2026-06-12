@@ -1,0 +1,44 @@
+# TRIDENT — Target Profile (GENERIC schema)
+# Any GenAI target plugs into TRIDENT through one of these profiles + a SuccessOracle.
+# The generic core NEVER hardcodes a target. Targetability of a technique is COMPUTED:
+# a technique runs only if the target's `capabilities` satisfy the technique's `needs_capabilities`.
+#
+# This file documents the schema with an illustrative (non-real) example.
+
+id: example-target                 # slug
+name: "Example GenAI app"
+base_url: "https://example.invalid"
+
+# Capabilities the target exposes. These are matched against each technique's needs_capabilities.
+# Vocabulary (keep in sync with the catalog):
+#   has_chat, has_retrieval, has_tools, is_agentic, multi_turn, exposes_system_prompt, auth, streaming
+capabilities: [has_chat, has_retrieval, has_tools, is_agentic, multi_turn]
+
+# Abstract attack surface -> concrete endpoint/handler. The adapter resolves these at runtime.
+# Catalog techniques reference abstract surfaces only (chat | retrieval_ingest | search | tool).
+surfaces:
+  chat:             { method: POST, path: /api/chat }
+  retrieval_ingest: { method: POST, path: /api/documents }
+  search:           { method: POST, path: /api/search }
+  tool:             { method: POST, path: /api/tools/invoke }
+
+auth:
+  type: bearer                      # none | bearer | apikey | cookie
+  login: { method: POST, path: /api/auth/login }
+
+# Optional, target-specific hardening levels (generic concept; names are per-target).
+defense_levels: [baseline, hardened]
+
+# Which deterministic success detectors this target supports (consumed by oracle.py / SuccessOracle).
+# Determines whether a technique's scorer can be "confirmed" (deterministic) vs "assessed" (judged).
+success_oracle:
+  canary:                                             # the harness plants this honeytoken before the attack
+    prefix: TRIDENT
+    plant_surface: retrieval_ingest                  # where to plant (chat | retrieval_ingest | search | tool)
+    data_classification: Confidential                # Highly Confidential | Confidential | General | Public  -> feeds severity (#4)
+  # flag: { pattern: "..." }                          # only CTF-style targets expose flags
+  leak:   { reference: "<known secret / system prompt of the test instance>" }   # white-box, validation-only
+  expected_model_set: [GPT, Llama, Mistral, Phi]      # optional, for categorical_match (fingerprint)
+
+egress: local-only                  # attack traffic stays local; control-plane (models/ASR) may reach Azure
+notes: "Illustrative profile. Replace with a real target instance (see aigoat.yaml)."
