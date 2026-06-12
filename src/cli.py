@@ -37,26 +37,20 @@ async def _run(args: argparse.Namespace) -> None:
     target = EchoTargetAdapter(canary=oracle.canary)
 
     client = TridentClient()
-    if not args.dry_run:
-        await client.start()
+    await client.start()
     try:
         coord = Coordinator(client, manifest, target, target_profile, registry, trace,
                             oracle=oracle)
 
-        if args.dry_run:
-            scorecards = await coord.run_direct(args.prompt)
-            corr = correlate(scorecards)
-        else:
-            summary = await coord.run_agentic(args.prompt)
-            scorecards: list[Scorecard] = []
-            for step in trace.steps():
-                if step.kind == "dispatch" and "scorecard" in step.payload:
-                    scorecards.append(Scorecard.model_validate(step.payload["scorecard"]))
-            corr = correlate(scorecards)
-            corr["coordinator_summary"] = summary
+        summary = await coord.run_agentic(args.prompt)
+        scorecards: list[Scorecard] = []
+        for step in trace.steps():
+            if step.kind == "dispatch" and "scorecard" in step.payload:
+                scorecards.append(Scorecard.model_validate(step.payload["scorecard"]))
+        corr = correlate(scorecards)
+        corr["coordinator_summary"] = summary
     finally:
-        if not args.dry_run:
-            await client.stop()
+        await client.stop()
 
     html_out = out_dir / f"{manifest.campaign_id}.html"
     render(corr, html_out)
@@ -73,8 +67,6 @@ def main() -> None:
     p.add_argument("--catalog", default="catalog", help="Catalog directory (default: catalog)")
     p.add_argument("--prompt", required=True, help="NL prompt describing what to test")
     p.add_argument("--out", default="output", help="Output directory (default: output)")
-    p.add_argument("--dry-run", action="store_true",
-                   help="Skip SDK; run skills directly through the EchoTargetAdapter.")
     asyncio.run(_run(p.parse_args()))
 
 

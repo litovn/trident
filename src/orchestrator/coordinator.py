@@ -1,5 +1,5 @@
 from ..core.client import TridentClient
-from ..core.models import Manifest, ScanPlan, Scorecard, TargetProfile
+from ..core.models import Manifest, ScanPlan, TargetProfile
 from ..core.policy_gate import PolicyGate
 from ..core.trace import Trace
 from ..nl.ranker import rank
@@ -9,7 +9,7 @@ from ..skills.pyrit_runner import PyritRunner
 from ..skills.registry import SkillRegistry
 from ..targets.adapter import TargetAdapter
 from ..targets.oracle import NullOracle, SuccessOracle
-from .dispatch import fan_out_directly, make_dispatch_tools
+from .dispatch import make_dispatch_tools
 
 COORDINATOR_PROMPT = (
     "You are the TRIDENT Coordinator. You have three dispatch tools: "
@@ -55,11 +55,6 @@ class Coordinator:
         return scope_to_scan(scope, self.manifest, self.target_profile, self.registry)
 
     # ---- Phase 3: execution ---------------------------------------------
-
-    async def run_direct(self, nl_prompt: str) -> list[Scorecard]:
-        """Non-agentic Phase 3 — invokes skills directly. No SDK needed."""
-        plan = self.intake(nl_prompt)
-        return await fan_out_directly(self.registry, self.ctx, plan)
 
     async def run_agentic(self, nl_prompt: str) -> str:
         """Agentic Phase 3 — Coordinator Session reasons over dispatch tools."""

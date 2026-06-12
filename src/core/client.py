@@ -2,16 +2,6 @@ from typing import Any, Optional
 from copilot import CopilotClient  
 from copilot.session import PermissionHandler 
 
-# Central model routing table — change here, not at call sites.
-# Strong model on the Coordinator (correlation reasoning), cheaper models on verticals.
-MODELS: dict[str, str] = {
-    "coordinator": "gpt-5",
-    "prompt": "gpt-4.1-mini",
-    "application": "gpt-4.1",
-    "model": "gpt-4.1",
-    "ranker": "gpt-4.1-mini",
-}
-    
 
 class TridentClient:
     def __init__(self) -> None:
@@ -38,16 +28,11 @@ class TridentClient:
         agent_prompt: Optional[str] = None,
         streaming: bool = True,
     ):
-        """Create a Session pre-configured for `role` (coordinator/prompt/application/model)."""
+        """Create a Session for `role`. The SDK auto-selects the model."""
         if not self.started:
             raise RuntimeError("TridentClient not started — call await client.start() first")
 
-        model = MODELS.get(role)
-        if not model:
-            raise ValueError(f"Unknown role {role!r}; add it to MODELS")
-
         kwargs: dict[str, Any] = dict(
-            model=model,
             tools=tools,
             streaming=streaming,
             on_permission_request=self._sdk_perm.approve_all,

@@ -1,9 +1,7 @@
-import asyncio
-
 from ..core.client import TridentClient
-from ..core.models import Layer, ScanPlan, Scorecard, VerticalConfig
+from ..core.models import Layer, Scorecard, VerticalConfig
 from ..core.trace import Trace
-from ..skills.base import SkillContext, make_skill_handler
+from ..skills.base import SkillContext
 from ..skills.registry import SkillRegistry
 
 
@@ -84,35 +82,3 @@ def make_dispatch_tools(client: TridentClient, registry: SkillRegistry, ctx: Ski
         return await _run_layer("model", params.vertical_config_json)
 
     return [dispatch_prompt_agent, dispatch_app_agent, dispatch_model_agent]
-
-
-async def fan_out_directly(
-    registry: SkillRegistry,
-    ctx: SkillContext,
-    plan: ScanPlan,
-) -> list[Scorecard]:
-    """Non-agentic fan-out — invokes every in-scope skill once.
-
-    Used for `--dry-run`, smoke tests, and any context where you want the
-    orchestrator to exercise skills *without* spinning up Copilot SDK sessions.
-    """
-
-    async def _one(vcfg: VerticalConfig) -> Scorecard:
-        ctx.trace.append_dispatch(
-            vcfg.layer, {"event": "begin-direct", "techniques": vcfg.technique_ids}
-        )
-        for tech in registry.for_layer(vcfg.layer, vcfg.technique_ids):
-            handler = make_skill_handler(tech, ctx)
-            await handler({
-                # Use the technique's first objective so the runner can resolve
-                # canary placeholders. Empty objectives fall back to `tech.desc`.
-                "objective": tech.objectives[0] if tech.objectives else "",
-                "endpoint": vcfg.target_profile.endpoint,
-            })
-        scorecard = _collect_scorecard(ctx.trace, vcfg)
-        ctx.trace.append_dispatch(
-            vcfg.layer, {"event": "end-direct", "scorecard": scorecard.model_dump()}
-        )
-        return scorecard
-
-    return await asyncio.gather(*[_one(v) for v in plan.verticals])
