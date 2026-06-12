@@ -1,0 +1,11 @@
+# Attack-mode variant — exploit-phase techniques fire end-to-end.
+campaign_id: smoke-002-attack
+mode: attack
+target_profile_id: echo
+layers: [prompt, application, model]
+technique_allowlist: []
+technique_denylist: []
+host_allowlist: [memory://echo, 127.0.0.1]
+query_budget_per_vertical: 20
+hitl_techniques: []
+egress_local_only: true
