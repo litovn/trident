@@ -191,14 +191,31 @@ class ScopeRanker:
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# Azure OpenAI implementations (lazy imports — module works offline without them)
+# Azure OpenAI implementations
 # ──────────────────────────────────────────────────────────────────────────
+def _foundry_env(*keys: str, default: str = "") -> str:
+    """Return the first non-empty env var among `keys`, else `default`."""
+    for k in keys:
+        v = os.environ.get(k, "").strip()
+        if v:
+            return v
+    return default
+
+
 def _azure_openai_client(api_version: str = "2024-10-21"):
-    """Build an AzureOpenAI client. Auth: AZURE_OPENAI_API_KEY if set, else
-    DefaultAzureCredential. Lazy imports so this module still runs offline."""
+    """Build an AzureOpenAI client pointed at Foundry. Auth precedence:
+    `AZURE_OPENAI_API_KEY` → `FOUNDRY_API_KEY` → DefaultAzureCredential
+    (Managed Identity in prod, `az login` locally). Lazy imports so this
+    module still runs offline."""
     from openai import AzureOpenAI  # type: ignore
-    endpoint = os.environ["AZURE_OPENAI_ENDPOINT"]
-    api_key = os.environ.get("AZURE_OPENAI_API_KEY")
+    endpoint = _foundry_env("AZURE_OPENAI_ENDPOINT", "FOUNDRY_ENDPOINT").rstrip("/")
+    if not endpoint:
+        raise RuntimeError(
+            "Foundry/Azure OpenAI endpoint not configured: set FOUNDRY_ENDPOINT "
+            "(preferred) or AZURE_OPENAI_ENDPOINT."
+        )
+    api_version = _foundry_env("AZURE_OPENAI_API_VERSION", "FOUNDRY_API_VERSION", default=api_version)
+    api_key = _foundry_env("AZURE_OPENAI_API_KEY", "FOUNDRY_API_KEY")
     if api_key:
         return AzureOpenAI(azure_endpoint=endpoint, api_key=api_key, api_version=api_version)
     from azure.identity import DefaultAzureCredential, get_bearer_token_provider  # type: ignore
@@ -214,8 +231,9 @@ class AzureOpenAIEmbedder:
 
     def __init__(self, deployment: str | None = None) -> None:
         self._client = _azure_openai_client()
-        self._deployment = deployment or os.environ.get(
-            "AZURE_OPENAI_EMBED_DEPLOYMENT", "text-embedding-3-large")
+        self._deployment = deployment or _foundry_env(
+            "AZURE_OPENAI_EMBED_DEPLOYMENT", "FOUNDRY_EMBED_DEPLOYMENT",
+            default="text-embedding-3-large")
 
     def embed(self, texts: Sequence[str]) -> list[list[float]]:
         if not texts:
@@ -230,8 +248,9 @@ class AzureOpenAIConfirmer:
 
     def __init__(self, deployment: str | None = None) -> None:
         self._client = _azure_openai_client()
-        self._deployment = deployment or os.environ.get(
-            "AZURE_OPENAI_CHAT_DEPLOYMENT", "gpt-4o-mini")
+        self._deployment = deployment or _foundry_env(
+            "AZURE_OPENAI_CHAT_DEPLOYMENT", "FOUNDRY_CHAT_DEPLOYMENT", "FOUNDRY_MODEL_DEPLOYMENT",
+            default="gpt-4o-mini")
 
     def confirm(self, query: str, candidates: list[TechniqueConfig]) -> list[str]:
         import json
@@ -299,10 +318,14 @@ def make_ranker(registry: SkillRegistry, *, offline: bool | None = None, **kwarg
     """Build a ScopeRanker.
     - offline=False  → force Azure OpenAI (embedder + confirmer)
     - offline=True   → force the deterministic offline stubs
-    - offline=None   → auto: Azure if AZURE_OPENAI_ENDPOINT is set, else stubs
+    - offline=None   → auto: Foundry/Azure if FOUNDRY_ENDPOINT or
+                       AZURE_OPENAI_ENDPOINT is set, else stubs
     """
     use_azure = (offline is False) or (
-        offline is None and bool(os.environ.get("AZURE_OPENAI_ENDPOINT")))
+        offline is None and bool(
+            os.environ.get("AZURE_OPENAI_ENDPOINT") or os.environ.get("FOUNDRY_ENDPOINT")
+        )
+    )
     if use_azure:
         return ScopeRanker(registry, AzureOpenAIEmbedder(), AzureOpenAIConfirmer(), **kwargs)
     corpus = ([t.embedding_text() for t in registry.techniques.values()]

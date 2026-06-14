@@ -186,22 +186,28 @@ output/<campaign>.html  +  output/<campaign>.trace.jsonl
 
 ---
 
-## Switching to Azure OpenAI (production ranker)
+## Switching to Microsoft Foundry 
 
-The ranker auto-detects Azure when `AZURE_OPENAI_ENDPOINT` is set. Otherwise the
-offline `KeywordEmbedder` + `PassthroughConfirmer` stubs are used (good for
-tests; OK for English-only demo prompts).
+Both the Copilot SDK Coordinator and the Phase-1 ranker route their model
+calls through Foundry using `DefaultAzureCredential` — every call bills
+against **Foundry credit, not GitHub Copilot tokens**. `FOUNDRY_ENDPOINT` is
+required; `TridentClient.start()` raises if it is unset. The ranker keeps a
+deterministic `KeywordEmbedder` + `PassthroughConfirmer` only for unit tests
+(no model call), not as a runtime fallback.
 
 ```powershell
-$env:AZURE_OPENAI_ENDPOINT       = "https://<your-foundry>.openai.azure.com"
-$env:AZURE_OPENAI_EMBED_DEPLOYMENT = "text-embedding-3-large"   # multilingual
-$env:AZURE_OPENAI_CHAT_DEPLOYMENT  = "gpt-4o-mini"              # JSON-mode confirmer
-# Auth: either AZURE_OPENAI_API_KEY or DefaultAzureCredential (preferred in Foundry).
-pip install -e ".[real]"
+$env:FOUNDRY_ENDPOINT          = "https://<your-foundry>.cognitiveservices.azure.com"
+$env:FOUNDRY_MODEL_DEPLOYMENT  = "gpt-4o-mini"           # Coordinator + ranker chat
+$env:FOUNDRY_EMBED_DEPLOYMENT  = "text-embedding-3-large" # ranker embedder (multilingual)
+# Auth (preferred): DefaultAzureCredential — `az login` locally, MI in prod.
+# Optional BYOK shortcut: $env:FOUNDRY_API_KEY = "..."
+az login
+pip install -e ".[sdk,ranker]"
 ```
 
-No code change required — the same `make_ranker(registry)` factory picks the
-Azure backend.
+No code change required — `TridentClient` (in `src/core/client.py`) and
+`make_ranker(registry)` both pick up the Foundry config from `FoundrySettings`
+in `src/core/config.py`. See `.env.example` for the full variable list.
 
 ---
 
