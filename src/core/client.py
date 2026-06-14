@@ -82,7 +82,7 @@ class TridentClient:
             "type": "azure",
             "base_url": f"{s.endpoint}/openai/deployments/{s.model_deployment}",
             "token_provider": self._token_provider,
-            "wire_api": "completions",
+            "wire_api": s.wire_api,
             "azure": {"api_version": s.api_version},
         }
 

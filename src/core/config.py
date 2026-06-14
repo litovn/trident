@@ -15,6 +15,7 @@ class FoundrySettings:
     project_name: str = "trident"
     api_key: str = ""              # local BYOK shortcut (prod uses MI)
     api_version: str = "2024-10-21"
+    wire_api: str = "chat_completions"   # Copilot SDK wire_api: chat_completions | responses | completions
 
     # ── Ranker-only overrides (Phase 1 NL→scope) ───────────────────────
     embed_deployment: str = "text-embedding-3-large"
@@ -32,6 +33,7 @@ class FoundrySettings:
             project_name=_env("FOUNDRY_PROJECT_NAME", "trident"),
             api_key=_env("FOUNDRY_API_KEY"),
             api_version=_env("FOUNDRY_API_VERSION", "2024-10-21"),
+            wire_api=_env("FOUNDRY_WIRE_API", "chat_completions"),
             embed_deployment=_env("FOUNDRY_EMBED_DEPLOYMENT", "text-embedding-3-large"),
             chat_deployment=_env("FOUNDRY_CHAT_DEPLOYMENT"),
             appinsights_connection_string=_env("APPLICATIONINSIGHTS_CONNECTION_STRING"),
