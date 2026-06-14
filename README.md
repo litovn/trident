@@ -103,6 +103,8 @@ three layers, the EchoTargetAdapter surfaces the planted canary, and the
 Drop `--dry-run`. Requires the Copilot SDK installed and authenticated.
 
 ```powershell
+python -m src.cli --manifest manifests/sample_attack.yaml --target targets/echo.yaml --catalog catalog --out output --prompt ""
+
 trident `
   --manifest manifests/sample_attack.yaml `
   --target   targets/echo.yaml `

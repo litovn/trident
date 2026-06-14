@@ -72,7 +72,7 @@ class TridentClient:
             )
             self._credential = DefaultAzureCredential()
         return get_bearer_token_provider(
-            self._credential, "https://cognitiveservices.azure.com/.default"
+            self._credential, "https://services.azure.com/.default"
         )
 
     def _build_provider_config(self) -> dict:

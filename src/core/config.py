@@ -27,7 +27,7 @@ class FoundrySettings:
     @classmethod
     def from_env(cls) -> "FoundrySettings":
         return cls(
-            endpoint=_env("FOUNDRY_ENDPOINT").rstrip("/"),
+            endpoint=_env("FOUNDRY_ENDPOINT"),
             model_deployment=_env("FOUNDRY_MODEL_DEPLOYMENT", "gpt-4o-mini"),
             project_name=_env("FOUNDRY_PROJECT_NAME", "trident"),
             api_key=_env("FOUNDRY_API_KEY"),
@@ -43,7 +43,7 @@ class FoundrySettings:
         if not self.endpoint:
             raise RuntimeError(
                 "FOUNDRY_ENDPOINT is required. Set it to your Foundry account URL, "
-                "e.g. https://<account>.cognitiveservices.azure.com — see .env.example."
+                "e.g. https://<account>.services.azure.com — see .env.example."
             )
 
     @property
