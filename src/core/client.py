@@ -95,9 +95,17 @@ class TridentClient:
         tools: list,
         agent_prompt: Optional[str] = None,
         streaming: bool = True,
+        skill_directories: Optional[list[str]] = None,
+        enable_skills: bool = False,
     ):
         """Create a Session for `role`, bound to the Foundry deployment named
-        by `FOUNDRY_MODEL_DEPLOYMENT`."""
+        by `FOUNDRY_MODEL_DEPLOYMENT`.
+
+        ``skill_directories`` lists folders the SDK scans for SKILL.md files.
+        ``enable_skills`` toggles skill matching on (default off — caller wins;
+        empty-mode clients require this to be True for the skills to actually be
+        discoverable at runtime).
+        """
         if not self.started:
             raise RuntimeError("TridentClient not started — call await client.start() first")
 
@@ -108,6 +116,9 @@ class TridentClient:
             on_permission_request=self._sdk_perm.approve_all,
             provider=self._build_provider_config(),
         )
+        if skill_directories:
+            kwargs["skill_directories"] = skill_directories
+            kwargs["enable_skills"] = enable_skills or True  # any dir → enable
         if agent_prompt:
             kwargs["custom_agents"] = [
                 {

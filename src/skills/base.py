@@ -17,6 +17,10 @@ class SkillContext:
     runner: PyritRunner
     trace: Trace
     target: TargetAdapter
+    # Directory containing generated SKILL.md trees (one subdir per technique).
+    # Passed to `client.create_session(skill_directories=[...])` by the SDK
+    # wiring so the Copilot agent can match techniques as skills at runtime.
+    skills_dir: str = "catalog/skills_catalog"
 
 
 def make_skill_handler(tech: TechniqueConfig, ctx: SkillContext) -> SkillHandler:

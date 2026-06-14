@@ -1,15 +1,15 @@
 from ..core.client import TridentClient
-from ..core.models import Manifest, ScanPlan, TargetProfile
+from ..core.models import Manifest, ScanPlan, Scorecard, TargetProfile
 from ..core.policy_gate import PolicyGate
 from ..core.trace import Trace
 from ..nl.ranker import rank
 from ..nl.scope_to_scan import scope_to_scan
-from ..skills.base import SkillContext
+from ..skills.base import SkillContext, make_skill_handler
 from ..skills.pyrit_runner import PyritRunner
 from ..skills.registry import SkillRegistry
 from ..targets.adapter import TargetAdapter
 from ..targets.oracle import NullOracle, SuccessOracle
-from .dispatch import make_dispatch_tools
+from .dispatch import _collect_scorecard, make_dispatch_tools
 
 COORDINATOR_PROMPT = (
     "You are the TRIDENT Coordinator. You have three dispatch tools: "
@@ -25,7 +25,7 @@ class Coordinator:
 
     def __init__(
         self,
-        client: TridentClient,
+        client: TridentClient | None,
         manifest: Manifest,
         target: TargetAdapter,
         target_profile: TargetProfile,
@@ -33,6 +33,7 @@ class Coordinator:
         trace: Trace,
         oracle: SuccessOracle | None = None,
     ) -> None:
+        # `client` may be None in non-agentic mode (no Foundry/SDK required).
         self.client = client
         self.manifest = manifest
         self.target = target
@@ -78,3 +79,27 @@ class Coordinator:
         )
         response = await session.send_and_wait(user_prompt)
         return getattr(getattr(response, "data", None), "content", "") if response else ""
+
+    # ---- Phase 3 (alternate): non-agentic fan-out -----------------------
+
+    async def run_non_agentic(self, nl_prompt: str) -> dict[str, Scorecard]:
+        """Deterministic fan-out: run every in-scope technique via its handler,
+        bypassing the SDK Session and the Coordinator LLM. Same gate, same
+        trace — only the orchestration changes. Use for smoke tests, CI, or
+        when the agentic path is unavailable (no Foundry credentials, network
+        outage, demo determinism)."""
+        from ..agents.factory import fan_out_directly
+
+        plan = self.intake(nl_prompt)
+        scorecards: dict[str, Scorecard] = {}
+        for vcfg in plan.verticals:
+            techs = self.registry.for_layer(vcfg.layer, vcfg.technique_ids)
+            handlers = [make_skill_handler(t, self.ctx) for t in techs]
+            self.trace.append_dispatch(vcfg.layer, {
+                "event": "begin", "techniques": vcfg.technique_ids, "mode": "non_agentic",
+            })
+            await fan_out_directly(handlers)
+            sc = _collect_scorecard(self.trace, vcfg)
+            scorecards[vcfg.layer] = sc
+            self.trace.append_dispatch(vcfg.layer, {"event": "end", "scorecard": sc.model_dump()})
+        return scorecards

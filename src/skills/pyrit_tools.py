@@ -20,16 +20,23 @@ Implementation note: this module must NOT use ``from __future__ import
 annotations``. The SDK's ``@define_tool`` calls ``typing.get_type_hints`` on the
 decorated function, which cannot resolve the locally-defined Pydantic ``Params``
 classes if their annotations are stored as strings.
+
+v0 honesty caveats:
+  * ``pyrit_run_orchestrator`` is a STUB — it loops ``pyrit_send_prompt`` with
+    the same prompt N times. Real Crescendo/TAP/PAIR (turn-evolving attacker
+    LLM, conversational memory) arrives with the actual PyRIT install. The tool
+    response sets ``kind: "stub_v0"`` so the agent knows.
+  * Converters declared in the catalog (``technique.converters``) ARE applied
+    via ``PyritRunner``. Per-call converter overrides from the agent are NOT
+    accepted yet, because the runner would silently ignore them — adding the
+    field would lie to the agent. Re-introduce once PyRIT is wired for real.
 """
 from typing import Any
 
 from ..core.models import DETERMINISTIC_SCORERS, Verdict
 from .base import SkillContext, make_skill_handler
+from .pyrit_runner import judged_verdict_v0
 from .registry import SkillRegistry
-
-
-def _split_converters(raw: str) -> list[str]:
-    return [c.strip() for c in (raw or "").split(",") if c.strip()]
 
 
 def make_pyrit_tools(registry: SkillRegistry, ctx: SkillContext) -> list:
@@ -52,15 +59,16 @@ def make_pyrit_tools(registry: SkillRegistry, ctx: SkillContext) -> list:
     class SendPromptParams(BaseModel):
         technique_id: str = Field(description="Catalog technique id this send belongs to (e.g. TRD-PRM-001)")
         prompt: str = Field("", description="Attack prompt. Empty → the technique's first objective is used.")
-        converters: str = Field("", description="Comma-separated PyRIT converters to apply (e.g. 'Base64,Flip').")
         endpoint: str = Field("", description="Optional target endpoint (must satisfy host_allowlist).")
 
     @define_tool(
         name="pyrit_send_prompt",
         description=(
-            "Send a single (optionally converted) prompt to the target via PyRIT. "
-            "Records a gate decision and an execution result attributed to technique_id. "
-            "Returns the target response plus the scorer verdict for the technique."
+            "Send a single prompt to the target via PyRIT. The converters declared by "
+            "the technique in the catalog are applied automatically; per-call overrides "
+            "are not supported in v0. Records a gate decision and an execution result "
+            "attributed to technique_id. Returns the target response plus the scorer "
+            "verdict for the technique."
         ),
     )
     async def pyrit_send_prompt(params: SendPromptParams) -> dict:
@@ -71,7 +79,6 @@ def make_pyrit_tools(registry: SkillRegistry, ctx: SkillContext) -> list:
         return await handler({
             "prompt": params.prompt,
             "endpoint": params.endpoint,
-            "converters": _split_converters(params.converters),
         })
 
     # ---- pyrit_run_scorer -------------------------------------------------
@@ -85,24 +92,17 @@ def make_pyrit_tools(registry: SkillRegistry, ctx: SkillContext) -> list:
         name="pyrit_run_scorer",
         description=(
             "Evaluate a target response with a scorer. Deterministic scorers route "
-            "through the SuccessOracle (confirmed verdicts); judged scorers return a "
-            "v0 surrogate assessment. Informational — does not itself fire a technique."
+            "through the SuccessOracle (confirmed verdicts); judged scorers use a v0 "
+            "refusal heuristic (refusals → failure, otherwise → tentative success). "
+            "Informational — does not itself fire a technique."
         ),
     )
     async def pyrit_run_scorer(params: RunScorerParams) -> dict:
         verdict: Verdict
         if params.scorer in DETERMINISTIC_SCORERS:
             verdict = ctx.runner.oracle.detect(params.scorer, params.response)
-        elif params.response:
-            verdict = Verdict(
-                success=True, kind="assessed",
-                evidence=f"v0 surrogate for scorer={params.scorer!r}: response present",
-            )
         else:
-            verdict = Verdict(
-                success=False, kind="assessed",
-                evidence=f"v0 surrogate for scorer={params.scorer!r}: empty response",
-            )
+            verdict = judged_verdict_v0(params.scorer, params.response)
         return {"status": "ok", "scorer": params.scorer, **verdict.model_dump()}
 
     # ---- pyrit_run_orchestrator ------------------------------------------
@@ -116,9 +116,12 @@ def make_pyrit_tools(registry: SkillRegistry, ctx: SkillContext) -> list:
     @define_tool(
         name="pyrit_run_orchestrator",
         description=(
-            "Run a multi-turn PyRIT orchestrator (Crescendo/TAP/PAIR) against the target. "
-            "v0 scaffold: iterates pyrit_send_prompt up to max_turns, stopping on first "
-            "success. Each turn is gated and traced under technique_id."
+            "STUB (v0): does NOT yet run a real PyRIT orchestrator. Iterates "
+            "pyrit_send_prompt up to max_turns with the same objective each turn, "
+            "stopping on first success. Each turn is gated and traced under "
+            "technique_id. The response includes kind='stub_v0' so callers know "
+            "this is not real Crescendo/TAP/PAIR; turn-evolving attacker prompts "
+            "arrive once PyRIT is wired for real."
         ),
     )
     async def pyrit_run_orchestrator(params: RunOrchestratorParams) -> dict:
@@ -138,6 +141,7 @@ def make_pyrit_tools(registry: SkillRegistry, ctx: SkillContext) -> list:
                 break
         return {
             "status": "ok",
+            "kind": "stub_v0",
             "technique_id": params.technique_id,
             "strategy": params.strategy,
             "turns_used": len(turns),

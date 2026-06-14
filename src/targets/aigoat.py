@@ -23,7 +23,7 @@ class AIGoatTargetAdapter:
         profile: TargetProfile,
         password: str,
         canary: str | None = None,
-        timeout: float = 180.0,   # Ollama cold-load + Mistral 7B inference on CPU can exceed 60s
+        timeout: float = 360.0,   # > AIGoat's internal ollama.timeout (300s); Mistral 7B on CPU is slow
     ) -> None:
         if not profile.base_url:
             raise ValueError("AIGoat profile missing base_url")
