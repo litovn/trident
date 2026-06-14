@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import json
+import os
 from pathlib import Path
 
 import yaml
@@ -12,12 +13,28 @@ from .orchestrator.coordinator import Coordinator
 from .reports.correlator import correlate
 from .reports.html_report import render
 from .skills.registry import SkillRegistry
+from .targets.adapter import TargetAdapter
+from .targets.aigoat import AIGoatTargetAdapter
 from .targets.echo import EchoTargetAdapter
 from .targets.oracle import NullOracle, SuccessOracle
 
 
 def _load_yaml(path: Path) -> dict:
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+
+
+def _build_target(profile: TargetProfile, canary: str | None) -> TargetAdapter:
+    if profile.id == "echo":
+        return EchoTargetAdapter(canary=canary)
+    if profile.id == "aigoat":
+        password = os.environ.get("AIGOAT_PASSWORD")
+        if not password:
+            raise RuntimeError(
+                "AIGOAT_PASSWORD env var is required to attack the AIGoat target "
+                "(e.g. $env:AIGOAT_PASSWORD='password123')."
+            )
+        return AIGoatTargetAdapter(profile=profile, password=password, canary=canary)
+    raise ValueError(f"Unknown target profile id: {profile.id!r}")
 
 
 async def _run(args: argparse.Namespace) -> None:
@@ -29,12 +46,9 @@ async def _run(args: argparse.Namespace) -> None:
     trace_path = out_dir / f"{manifest.campaign_id}.trace.jsonl"
     trace = Trace(jsonl_path=trace_path)
 
-    # Build the SuccessOracle from the target profile and share its canary with
-    # the EchoTargetAdapter so deterministic scorers can fire in --dry-run.
     oracle = (SuccessOracle(target_profile.success_oracle)
               if target_profile.success_oracle else NullOracle())
-    # V0: hardcoded EchoTargetAdapter. V1: select by target_profile.id from a registry.
-    target = EchoTargetAdapter(canary=oracle.canary)
+    target = _build_target(target_profile, canary=oracle.canary)
 
     client = TridentClient()
     await client.start()
@@ -51,6 +65,9 @@ async def _run(args: argparse.Namespace) -> None:
         corr["coordinator_summary"] = summary
     finally:
         await client.stop()
+        aclose = getattr(target, "aclose", None)
+        if aclose is not None:
+            await aclose()
 
     html_out = out_dir / f"{manifest.campaign_id}.html"
     render(corr, html_out)

@@ -1,0 +1,12 @@
+# AIGoat L0 — simple direct prompt injection smoke run (TRD-PRM-002).
+# Single-layer campaign (prompt only) — respects ADR-021 "1 layer or 3, never 2".
+campaign_id: aigoat-l0-prompt-injection
+mode: attack
+target_profile_id: aigoat
+layers: [prompt]
+technique_allowlist: [TRD-PRM-002]
+technique_denylist: []
+host_allowlist: [127.0.0.1]
+query_budget_per_vertical: 5
+hitl_techniques: []
+egress_local_only: true

@@ -12,3 +12,5 @@ tests/
 docs/
 
 *.toml
+
+context/
