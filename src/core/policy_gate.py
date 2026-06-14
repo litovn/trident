@@ -1,8 +1,26 @@
+from urllib.parse import urlsplit
+
 from .models import Action, Decision, Manifest, Phase, TechniqueConfig
 
 
 # Recon-mode policy: which technique phases survive (ADR-018)
 _RECON_OK_PHASES: set[Phase] = {"recon", "both"}
+
+
+def _host_of(s: str) -> str:
+    """Extract a hostname from a URL, host:port, or bare host.
+
+    Examples:
+        http://127.0.0.1:8000  -> 127.0.0.1
+        memory://echo          -> echo
+        127.0.0.1              -> 127.0.0.1
+        api.example.com:8443   -> api.example.com
+    """
+    if not s:
+        return ""
+    if "://" in s:
+        return (urlsplit(s).hostname or "").lower()
+    return s.split("/", 1)[0].split(":", 1)[0].lower()
 
 
 class PolicyGate:
@@ -52,12 +70,16 @@ class PolicyGate:
         if used >= m.query_budget_per_vertical:
             return Decision(allow=False, reason="query budget exhausted", rule="budget")
 
-        # 6) Host allowlist (only checked if endpoint param present)
+        # 6) Host allowlist (only checked if endpoint param present).
+        # Compares hostnames, not substrings, to prevent
+        # `https://evil.com/proxy?to=127.0.0.1` from satisfying ["127.0.0.1"].
         endpoint = (action.params or {}).get("endpoint", "")
         if endpoint and m.host_allowlist:
-            if not any(allowed in endpoint for allowed in m.host_allowlist):
+            ep_host = _host_of(endpoint)
+            allowed_hosts = {_host_of(a) for a in m.host_allowlist}
+            if not ep_host or ep_host not in allowed_hosts:
                 return Decision(allow=False,
-                                reason=f"endpoint {endpoint} not in host_allowlist",
+                                reason=f"endpoint host {ep_host!r} (from {endpoint!r}) not in host_allowlist",
                                 rule="host_allowlist")
 
         # 7) HITL — v0 stub: deny; v1 will prompt
