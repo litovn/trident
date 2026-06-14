@@ -28,7 +28,11 @@ def make_skill_handler(tech: TechniqueConfig, ctx: SkillContext) -> SkillHandler
 
     async def handler(params: dict) -> dict:
         params = params or {}
-        action = Action(technique_id=tech.id, layer=tech.layer, params=params)
+        # Fail-closed for host_allowlist: the gate's rule 6 only fires when
+        # `endpoint` is present in params. Tools default it to "" and the LLM
+        # rarely passes it, so we bind the adapter's real endpoint here.
+        gate_params = {**params, "endpoint": params.get("endpoint") or getattr(ctx.target, "endpoint", "")}
+        action = Action(technique_id=tech.id, layer=tech.layer, params=gate_params)
 
         decision = ctx.gate.check(action)
         ctx.trace.append_gate(action, decision)
