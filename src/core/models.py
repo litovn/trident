@@ -187,13 +187,23 @@ class TargetProfile(BaseModel):
 
 # ──────────────────────────────────────────────────────────────────────────
 # Manifest (Rules of Engagement as Code — ADR-008)
+#
+# Design intent: the manifest declares *constraints* (safety, budget, hosts),
+# not the *plan*. Layer and technique selection are driven by the NL prompt
+# via the ranker. Optional pin-down fields (layers / allowlist) remain for
+# deterministic smoke tests and CI, but must be empty by default so TRIDENT
+# is free to decide.
 # ──────────────────────────────────────────────────────────────────────────
 class Manifest(BaseModel):
     campaign_id: str
     mode: Mode = "recon"
     target_profile_id: str
-    layers: list[Layer]                                       # 1 or all 3, never exactly 2 (ADR-021)
+    # Empty = no layer pin: the ranker chooses layers from the prompt.
+    # If populated, restricts to the listed layers (ADR-021: 1 or all 3).
+    layers: list[Layer] = Field(default_factory=list)
+    # Empty = no allowlist; ranker picks freely. Populate only for pinned smoke tests.
     technique_allowlist: list[str] = Field(default_factory=list)
+    # Kept for future "block specific techniques" use case (refined later).
     technique_denylist: list[str] = Field(default_factory=list)
     host_allowlist: list[str] = Field(default_factory=list)
     query_budget_per_vertical: int = 100

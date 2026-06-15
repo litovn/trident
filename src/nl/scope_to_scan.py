@@ -39,7 +39,16 @@ def scope_to_scan(
     skipped: list[dict[str, Any]] = []
     seen: set[str] = set()
 
-    for layer in manifest.layers:
+    # ADR-008: the manifest declares constraints, not the plan.
+    # When `manifest.layers` is empty the ranker decides which layers to
+    # exercise (driven by the NL prompt); when populated, it pins the scope.
+    active_layers: list[Layer] = (
+        list(manifest.layers)
+        if manifest.layers
+        else [lyr for lyr in scope.techniques_by_layer if scope.techniques_by_layer[lyr]]
+    )
+
+    for layer in active_layers:
         for tid in scope.techniques_by_layer.get(layer, []):
             if tid in seen or tid not in registry.techniques:
                 continue
@@ -73,7 +82,7 @@ def scope_to_scan(
         by_layer.setdefault(t.layer, []).append(t)
 
     verticals: list[VerticalConfig] = []
-    for layer in manifest.layers:
+    for layer in active_layers:
         techs = by_layer.get(layer)
         if not techs:
             continue
