@@ -1,8 +1,13 @@
+import os
+
 from ..core.client import TridentClient
 from ..core.models import Layer, Scorecard, VerticalConfig
 from ..core.trace import Trace
 from ..skills.base import SkillContext
 from ..skills.registry import SkillRegistry
+
+# Per-vertical Copilot SDK session timeout (see coordinator.py for rationale).
+_VERTICAL_TIMEOUT = float(os.environ.get("TRIDENT_VERTICAL_TIMEOUT", "1200"))
 
 
 def _collect_scorecard(trace: Trace, vcfg: VerticalConfig) -> Scorecard:
@@ -64,7 +69,7 @@ def make_dispatch_tools(client: TridentClient, registry: SkillRegistry, ctx: Ski
 
         ctx.trace.append_dispatch(layer, {"event": "begin", "techniques": vcfg.technique_ids})
         session = await build_vertical_session(client, vcfg, registry, ctx)
-        await session.send_and_wait(build_brief(vcfg))
+        await session.send_and_wait(build_brief(vcfg), timeout=_VERTICAL_TIMEOUT)
         scorecard = _collect_scorecard(ctx.trace, vcfg)
         ctx.trace.append_dispatch(layer, {"event": "end", "scorecard": scorecard.model_dump()})
         return scorecard.model_dump()

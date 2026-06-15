@@ -1,3 +1,5 @@
+import os
+
 from ..core.client import TridentClient
 from ..core.models import Manifest, ScanPlan, Scorecard, TargetProfile
 from ..core.policy_gate import PolicyGate
@@ -18,6 +20,12 @@ COORDINATOR_PROMPT = (
     "VerticalConfig JSON. After all dispatches return, briefly summarize the cross-layer "
     "findings. Never invent techniques — verticals already have their fenced subsets."
 )
+
+# Copilot SDK ``send_and_wait`` defaults to 60 s, which is too low for slow targets:
+# AIGoat with Mistral 7B on CPU can take up to 360 s per HTTP call (see
+# ``src/targets/aigoat.py``), and the Coordinator fan-outs across 1–3 verticals,
+# each running multiple turns. Override via env when targets are even slower.
+_COORDINATOR_TIMEOUT = float(os.environ.get("TRIDENT_COORDINATOR_TIMEOUT", "1800"))
 
 
 class Coordinator:
@@ -77,7 +85,7 @@ class Coordinator:
             "cross-layer summary.\n\n"
             f"{plan_payload}"
         )
-        response = await session.send_and_wait(user_prompt)
+        response = await session.send_and_wait(user_prompt, timeout=_COORDINATOR_TIMEOUT)
         return getattr(getattr(response, "data", None), "content", "") if response else ""
 
     # ---- Phase 3 (alternate): non-agentic fan-out -----------------------

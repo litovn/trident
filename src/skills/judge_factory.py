@@ -11,9 +11,45 @@ Verdict kind is always ``assessed`` for judged scorers (per catalog/scorers.md):
 no LLM judge is ground-truth.
 """
 from typing import Any
+from urllib.parse import urlparse
 
 from ..core.config import get_foundry_settings
 from ..core.models import Verdict
+
+
+def _pyrit_base_url(raw_endpoint: str) -> str:
+    """Normalize a Foundry/Azure OpenAI endpoint for PyRIT's ``OpenAIChatTarget``.
+
+    PyRIT passes ``endpoint`` straight to the OpenAI Python SDK as ``base_url``
+    (via ``AsyncOpenAI``) and expects the modern Azure OpenAI v1 URL shape:
+        ``https://<acct>.openai.azure.com/openai/v1``
+
+    The rest of TRIDENT keeps ``FOUNDRY_ENDPOINT`` as the bare account URL
+    (Copilot SDK in ``core/client.py`` appends ``/openai/deployments/<dep>``;
+    the ranker in ``nl/ranker.py`` uses ``AzureOpenAI(azure_endpoint=...)``
+    which builds the path itself). Both reject a pre-suffixed ``/openai/v1``.
+    So we normalize *only at this boundary* instead of mutating the shared
+    env var.
+
+    Idempotent: works whether ``FOUNDRY_ENDPOINT`` is bare or already
+    suffixed with ``/openai/v1``. Non-Azure-OpenAI hosts (Foundry
+    ``*.services.ai.azure.com`` / ``*.models.ai.azure.com``, custom) pass
+    through unchanged.
+    """
+    raw = (raw_endpoint or "").strip().rstrip("/")
+    if not raw:
+        return raw
+    try:
+        parsed = urlparse(raw)
+    except ValueError:
+        return raw
+    host = (parsed.netloc or "").lower()
+    path = parsed.path or ""
+    if host.endswith(".openai.azure.com"):
+        if "/openai/v1" in path or "/openai/deployments/" in path:
+            return raw
+        return f"{raw}/openai/v1"
+    return raw
 
 
 def make_judge_target() -> Any | None:
@@ -26,14 +62,13 @@ def make_judge_target() -> Any | None:
     if not s.endpoint:
         return None
     from pyrit.prompt_target import OpenAIChatTarget
-    # Foundry exposes OpenAI-compatible chat completions; the SDK reads
-    # endpoint/model/api_version/api_key from these standard env vars that
-    # we also set elsewhere (config.py). We pass them through kwargs so
-    # PyRIT's OpenAI client picks them up without our patching.
+    # PyRIT wraps the OpenAI Python SDK's ``AsyncOpenAI(base_url=...)`` and does
+    # NOT accept ``api_version`` — for the modern Azure OpenAI v1 surface the
+    # ``api-version`` query parameter is no longer required. ``FOUNDRY_API_VERSION``
+    # is still used by the Copilot SDK (core/client.py) and the ranker.
     return OpenAIChatTarget(
-        endpoint=s.endpoint,
+        endpoint=_pyrit_base_url(s.endpoint),
         model_name=s.effective_chat_deployment,
-        api_version=s.api_version,
         api_key=s.api_key or None,
         temperature=0.0,
     )
