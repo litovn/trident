@@ -4,6 +4,10 @@ import re
 from ..core.models import DETERMINISTIC_SCORERS, ExecutionResult, Severity, TechniqueConfig, Verdict
 from ..targets.adapter import TargetAdapter
 from ..targets.oracle import NullOracle, SuccessOracle, resolve_placeholders
+from .converter_factory import apply_converters_async, build_converters
+from .judge_factory import make_judge_target, score_judged_async
+from .pyrit_bootstrap import ensure_pyrit_initialized
+from .scorer_factory import score_deterministic
 
 
 # Data classification → MSRC-style severity bump on confirmed leaks.
@@ -80,6 +84,8 @@ class PyritRunner:
 
     def __init__(self, oracle: SuccessOracle | None = None) -> None:
         self.oracle: SuccessOracle = oracle or NullOracle()
+        ensure_pyrit_initialized()
+        self._judge_target = make_judge_target()  # None if Foundry not configured
 
     async def execute(
         self,
@@ -97,8 +103,12 @@ class PyritRunner:
         )
         prompt = params.get("prompt") or resolved_objective or tech.desc
 
-        response = await target.send(prompt)
-        verdict = self._score(tech, response.text)
+        # Apply catalog-declared single-turn converters via PyRIT.
+        converters = build_converters(tech.converters or [])
+        converted_prompt = await apply_converters_async(prompt, converters) if converters else prompt
+
+        response = await target.send(converted_prompt)
+        verdict = await self._score(tech, response.text, resolved_objective)
 
         # Severity: baseline; bump on confirmed disclosure-class hits
         severity: Severity = tech.severity_base
@@ -116,6 +126,7 @@ class PyritRunner:
             metadata={
                 "target": target.id,
                 "converters": tech.converters,
+                "converted_prompt": converted_prompt if converters else None,
                 "scorer": tech.scorer,
                 "objective_resolved": resolved_objective,
             },
@@ -123,10 +134,14 @@ class PyritRunner:
 
     # ---- scoring -------------------------------------------------------
 
-    def _score(self, tech: TechniqueConfig, response_text: str) -> Verdict:
-        """Route to the oracle for deterministic scorers; v0 heuristic otherwise."""
+    async def _score(
+        self, tech: TechniqueConfig, response_text: str, objective: str | None
+    ) -> Verdict:
+        """Route to PyRIT scorers; deterministic via SubString/MarkdownInjection,
+        judged via SelfAsk* (with v0 heuristic fallback when no judge target)."""
         if tech.scorer in DETERMINISTIC_SCORERS:
-            return self.oracle.detect(tech.scorer, response_text)
-        # Judged scorers: v0 refusal heuristic (filters refusals as failures).
-        # v1 wires PyRIT SelfAskRefusalScorer / SelfAskTrueFalseScorer here.
-        return judged_verdict_v0(tech.scorer, response_text)
+            return await score_deterministic(tech.scorer, response_text, self.oracle)
+        return await score_judged_async(
+            tech.scorer, response_text,
+            objective=objective, judge_target=self._judge_target,
+        )
