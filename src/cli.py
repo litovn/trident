@@ -60,24 +60,13 @@ async def _run(args: argparse.Namespace) -> None:
               if target_profile.success_oracle else NullOracle())
     target = _build_target(target_profile, canary=oracle.canary)
 
-    # Non-agentic mode skips the Foundry/SDK client entirely — useful for
-    # smoke tests and CI where no LLM Coordinator is required.
-    use_sdk = args.mode == "agentic"
-    client = TridentClient() if use_sdk else None
-    if client is not None:
-        await client.start()
+    client = TridentClient()
+    await client.start()
     try:
         coord = Coordinator(client, manifest, target, target_profile, registry, trace,
                             oracle=oracle)
 
-        if use_sdk:
-            summary = await coord.run_agentic(args.prompt)
-        else:
-            scorecards_dict = await coord.run_non_agentic(args.prompt)
-            summary = (
-                f"non-agentic fan-out across {len(scorecards_dict)} vertical(s): "
-                + ", ".join(f"{lyr}=ASR {sc.asr}" for lyr, sc in scorecards_dict.items())
-            )
+        summary = await coord.run_agentic(args.prompt)
 
         scorecards: list[Scorecard] = []
         for step in trace.steps():
@@ -86,8 +75,7 @@ async def _run(args: argparse.Namespace) -> None:
         corr = correlate(scorecards)
         corr["coordinator_summary"] = summary
     finally:
-        if client is not None:
-            await client.stop()
+        await client.stop()
         aclose = getattr(target, "aclose", None)
         if aclose is not None:
             await aclose()
@@ -107,8 +95,6 @@ def main() -> None:
     p.add_argument("--catalog", default="catalog", help="Catalog directory (default: catalog)")
     p.add_argument("--prompt", required=True, help="NL prompt describing what to test")
     p.add_argument("--out", default="output", help="Output directory (default: output)")
-    p.add_argument("--mode", choices=["agentic", "non-agentic"], default="agentic",
-                   help="agentic = SDK Coordinator with LLM; non-agentic = deterministic fan-out (no Foundry)")
     asyncio.run(_run(p.parse_args()))
 
 

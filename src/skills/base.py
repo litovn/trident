@@ -26,8 +26,8 @@ class SkillContext:
 def make_skill_handler(tech: TechniqueConfig, ctx: SkillContext) -> SkillHandler:
     """Factory: TechniqueConfig + context → callable handler.
 
-    The returned handler carries `.technique` so the SDK-wrapping layer
-    (`agents.factory.wrap_as_sdk_tools`) can read metadata without re-lookups.
+    The returned handler carries `.technique` so callers can read the technique
+    metadata off the handler without a registry re-lookup.
     """
 
     async def handler(params: dict) -> dict:

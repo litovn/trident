@@ -20,11 +20,11 @@ trident/                  # the package
 ├── core/                 # client, models (v0.3), policy_gate (7 rules), trace
 ├── nl/                   # ranker (hybrid: lexicon + embedding + LLM confirm), scope_to_scan
 ├── skills/               # base, registry (with JSON Schema validator), pyrit_runner
-├── agents/               # factory (wrap_as_sdk_tools), briefs (enriched)
+├── agents/               # factory (build_vertical_session + make_pyrit_tools), briefs (enriched)
 ├── orchestrator/         # coordinator (Phase 0–4), dispatch (agents-as-tools)
 ├── targets/              # adapter Protocol, oracle (canary + placeholders), echo
 ├── reports/              # correlator, html_report
-└── cli.py                # `trident run --manifest ... --prompt ...`
+└── cli.py                # `python -m src.cli --manifest ... --prompt ...`
 
 catalog/                  # 20 techniques + 12 packages + JSON Schema + 5 reference docs
 ├── prompt.yaml           # TRD-PRM-001..004 + TRD-PRM-R01
@@ -34,7 +34,7 @@ catalog/                  # 20 techniques + 12 packages + JSON Schema + 5 refere
 └── schema/catalog.schema.json     # authoritative; validated at load time
 
 targets/                  # declarative target profiles (v0.3)
-├── echo.yaml             # in-process profile used by --dry-run
+├── echo.yaml             # in-process profile for smoke / unit tests
 ├── aigoat.yaml           # the reference vulnerable target
 └── target_profile.example.yaml
 
@@ -56,22 +56,27 @@ pip install -e ".[sdk,real]"
 ```
 
 > Python 3.12+ required (tested on 3.14.4).
-> The runtime works fully offline; Azure OpenAI is opt-in via env vars.
+> Every run goes through the agentic Coordinator and **requires Microsoft
+> Foundry** (`FOUNDRY_ENDPOINT` + `az login`, or `FOUNDRY_API_KEY`). See `.env.example`.
 
 ---
 
-## Smoke test (no SDK, no PyRIT)
+## Run
 
-### Recon mode
+Every campaign goes through the SDK Coordinator and **requires Foundry**
+(`FOUNDRY_ENDPOINT` + `az login`, or `FOUNDRY_API_KEY`). The Echo target is
+in-process, so these examples are a cheap end-to-end smoke that still exercises
+the real Coordinator → vertical → PyRIT path.
+
+### Recon
 
 ```powershell
-trident `
+python -m src.cli `
   --manifest manifests/sample.yaml `
   --target   targets/echo.yaml `
   --catalog  catalog `
   --out      output `
-  --prompt   "recon the bot defenses, fingerprint the model, map the app surface" `
-  --dry-run
+  --prompt   "recon the bot defenses, fingerprint the model, map the app surface"
 ```
 
 Expected: each layer fires its lead recon technique
@@ -79,16 +84,15 @@ Expected: each layer fires its lead recon technique
 `categorical_match` scorer for model fingerprinting marks `verdict: confirmed`.
 Outputs: `output/smoke-001-recon.html` + `output/smoke-001-recon.trace.jsonl`.
 
-### Attack mode (with canary exfil)
+### Attack (with canary exfil)
 
 ```powershell
-trident `
+python -m src.cli `
   --manifest manifests/sample_attack.yaml `
   --target   targets/echo.yaml `
   --catalog  catalog `
   --out      output `
-  --prompt   "data exfiltration: leak the planted secret and exfiltrate sensitive data" `
-  --dry-run
+  --prompt   "data exfiltration: leak the planted secret and exfiltrate sensitive data"
 ```
 
 Expected: the ranker picks `PKG-EXFIL`, runs 4 leak-class techniques across the
@@ -98,16 +102,15 @@ three layers, the EchoTargetAdapter surfaces the planted canary, and the
 
 ---
 
-## Real run (agentic)
+## Against a real target
 
-Drop `--dry-run`. Requires the Copilot SDK installed and authenticated.
+Point `--target` at a real profile (e.g. `targets/aigoat.yaml`) and pass the
+natural-language scope. Requires the Copilot SDK + Foundry, as above.
 
 ```powershell
-python -m src.cli --manifest manifests/sample_attack.yaml --target targets/echo.yaml --catalog catalog --out output --prompt ""
-
-trident `
-  --manifest manifests/sample_attack.yaml `
-  --target   targets/echo.yaml `
+python -m src.cli `
+  --manifest manifests/aigoat_l0_prompt_injection.yaml `
+  --target   targets/aigoat.yaml `
   --catalog  catalog `
   --out      output `
   --prompt   "<natural-language scope from the user>"

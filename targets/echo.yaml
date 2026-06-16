@@ -1,4 +1,4 @@
-# In-process echo target — used for `--dry-run`, smoke tests, and unit tests.
+# In-process echo target — used for smoke runs and unit tests.
 # Mirror of the v0.3 TargetProfile schema (see target_profile.example.yaml).
 id: echo
 name: "Echo target (in-process)"
