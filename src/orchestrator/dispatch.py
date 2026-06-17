@@ -29,7 +29,10 @@ def _collect_scorecard(trace: Trace, vcfg: VerticalConfig) -> Scorecard:
                 successes += 1
             else:
                 failed += 1
-            if result.get("verdict") == "confirmed":
+            # An oracle hit = a SUCCESSFUL deterministic check. The oracle returns
+            # verdict="confirmed" for confirmed-negatives too (e.g. "no canary found"),
+            # so guard on success to avoid inflating the count.
+            if result.get("verdict") == "confirmed" and result.get("success"):
                 oracle_hits += 1
             findings.append({
                 "technique_id": s.technique_id,
