@@ -1,5 +1,10 @@
 """Generate Copilot SDK skills (SKILL.md) from the TRIDENT attack catalog (SCAFFOLD).
 
+STATUS: **v1 / future — NOT on the hackathon demo path.** For the demo the catalog and
+its ``SKILL.md`` files are hand-curated and committed under ``catalog/skills_catalog/``;
+this module is a *scaffold* for the eventual automatic-generation story and is not wired
+into any live session. Do not rely on it for the demo.
+
 Architecture (v0.4): each catalog technique becomes a *skill* — a directory with
 a ``SKILL.md`` (YAML frontmatter + progressive-disclosure body) that the vertical
 agent reasons over. The body tells the agent *what* the attack is (OWASP × ATLAS,
