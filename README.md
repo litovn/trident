@@ -24,7 +24,7 @@ We deliberately keep the surface small:
   onboard a target — just the handful of fields in **[Minimal target profile](#minimal-target-profile)**.
   `targets/echo.yaml` is the canonical minimal *generic* profile and runs out-of-the-box.
 - ✅ **canary / markup / LLM-judge are generic.** The success-detection suite is
-  target-agnostic (lives in `targets/oracle.py`, `skills/scorer_factory.py`,
+  target-agnostic (deterministic checks in `targets/oracle.py`, the LLM-judge in
   `skills/judge_factory.py`) — AIGoat is just one config, never a dependency. The
   LLM-judge degrades gracefully to an offline heuristic when Foundry is not configured.
 - ✅ **SKILL.md is the single source of truth.** Each technique is authored as a
