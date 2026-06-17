@@ -2,7 +2,7 @@
 
 Catalog version **v0.3** · target-agnostic · 3 layers (Prompt / Application / Model).
 Taxonomies: **OWASP GenAI/LLM Top 10 (2025)** × **MITRE ATLAS** (matrix v6 / 2026.05).
-Machine source: `catalog/prompt.yaml`, `catalog/application.yaml`, `catalog/model.yaml`. Packages: `catalog/packages.yaml`.
+Machine source: `catalog/skills_catalog/<ID>/SKILL.md` (YAML frontmatter, one per technique). Packages: `catalog/packages.yaml`.
 Principle: agents **select** from the catalog, they never invent. Recon vs Attack = a filter on the `phase` field.
 
 ---

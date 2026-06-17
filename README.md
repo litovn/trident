@@ -27,9 +27,10 @@ We deliberately keep the surface small:
   target-agnostic (lives in `targets/oracle.py`, `skills/scorer_factory.py`,
   `skills/judge_factory.py`) — AIGoat is just one config, never a dependency. The
   LLM-judge degrades gracefully to an offline heuristic when Foundry is not configured.
-- 🔜 **Automatic generation is v1 (future), out of demo scope.** The catalog and its
-  `SKILL.md` files are hand-curated and committed. `skills/skillgen.py` (auto-emitting
-  skills from the catalog) is a **scaffold only** and is **not** on the demo path.
+- ✅ **SKILL.md is the single source of truth.** Each technique is authored as a
+  `catalog/skills_catalog/<ID>/SKILL.md` (YAML frontmatter = full machine config,
+  Markdown body = agent-facing procedure). The registry loads techniques straight
+  from these files — there is no separate catalog YAML to keep in sync.
 
 ---
 
@@ -47,9 +48,10 @@ trident/                  # the package
 └── cli.py                # `python -m src.cli --manifest ... --prompt ...`
 
 catalog/                  # 20 techniques + 12 packages + JSON Schema + 5 reference docs
-├── prompt.yaml           # TRD-PRM-001..004 + TRD-PRM-R01
-├── application.yaml      # TRD-APP-001..008 + TRD-APP-R01
-├── model.yaml            # TRD-MOD-001..006  (-004/-005/-006 deferred-mvp)
+├── skills_catalog/       # one SKILL.md per technique — the single source of truth
+│   ├── TRD-PRM-*/SKILL.md    # 5 prompt techniques (frontmatter = full TechniqueConfig)
+│   ├── TRD-APP-*/SKILL.md    # 9 application techniques
+│   └── TRD-MOD-*/SKILL.md    # 6 model techniques (-004/-005/-006 deferred-mvp)
 ├── packages.yaml         # 12 packages: 4 profile + 3 layer + 5 focus
 └── schema/catalog.schema.json     # authoritative; validated at load time
 
@@ -317,10 +319,9 @@ in `src/core/config.py`. See `.env.example` for the full variable list.
 
 ## Roadmap (post-MVP)
 
-- **Automatic generation — v1 (out of demo scope).** Wire `skills/skillgen.py` (which
-  auto-emits `SKILL.md` from the catalog) into a live session, and grow it toward
-  automatic *technique* synthesis. For the demo the catalog + skills are hand-curated
-  and committed; `skillgen` is a scaffold only.
+- **Automatic *technique* synthesis — v1 (out of demo scope).** Grow tooling that
+  drafts new `SKILL.md` techniques (and recon → target-profile generation). Today
+  every technique is a hand-authored `SKILL.md` loaded directly by the registry.
 - Re-wire the `pytest` suite (policy gate, ranker, end-to-end dispatch).
 - Real PyRIT wiring as the default judge in `skills/pyrit_runner.py`
   (SelfAskRefusalScorer, SelfAskTrueFalseScorer) — today's default is the offline heuristic.

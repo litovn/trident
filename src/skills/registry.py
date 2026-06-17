@@ -11,6 +11,26 @@ from ..core.models import Layer, Package, TechniqueConfig
 class CatalogValidationError(Exception):
     """Raised when the catalog violates schema/catalog.schema.json."""
 
+def _read_frontmatter(path: Path) -> dict:
+    """Parse the YAML frontmatter block of a SKILL.md into a technique dict.
+
+    A SKILL.md is the single source of truth for one technique: the frontmatter
+    carries the full TechniqueConfig, the Markdown body is the agent-facing
+    procedure (ignored here).
+    """
+    text = path.read_text(encoding="utf-8")
+    parts = text.split("---", 2)
+    if len(parts) < 3 or parts[0].strip():
+        raise CatalogValidationError(f"{path}: missing or malformed YAML frontmatter")
+    fm = yaml.safe_load(parts[1]) or {}
+    if not isinstance(fm, dict):
+        raise CatalogValidationError(f"{path}: frontmatter is not a mapping")
+    # SKILL.md convention: `name` is the SDK skill slug (lowercase, == folder name);
+    # the human-readable technique label lives in `title`. TRIDENT's model uses
+    # `name` for the human label (ranker corpus, reports), so map title → name.
+    if "title" in fm:
+        fm["name"] = fm.pop("title")
+    return fm
 
 # ──────────────────────────────────────────────────────────────────────────
 # Pure-Python subset validator for the JSON Schema we use (type / required /
@@ -85,15 +105,27 @@ class SkillRegistry:
     # ---- loading -------------------------------------------------------
 
     def load_dir(self, catalog_dir: Path | str, *, validate: bool = True) -> "SkillRegistry":
-        """Load every *.yaml in `catalog_dir`. Files contribute `techniques` and/or
-        `packages` keys. Schema validation is on by default."""
+        """Load the catalog.
+
+        Techniques are sourced from ``skills_catalog/<ID>/SKILL.md`` frontmatter
+        (the single source of truth — a technique IS its skill). Packages are
+        curated bundles in ``packages.yaml``. Schema validation is on by default.
+        """
         d = Path(catalog_dir)
-        raw_t: list[dict] = []
+
+        # Techniques: one SKILL.md per technique; the YAML frontmatter carries the
+        # full TechniqueConfig (the Markdown body is the agent-facing procedure).
+        raw_t: list[dict] = [
+            _read_frontmatter(skill_md)
+            for skill_md in sorted((d / "skills_catalog").glob("*/SKILL.md"))
+        ]
+
+        # Packages: curated bundles (any *.yaml in the catalog root exposing `packages:`).
         raw_p: list[dict] = []
         for yml in sorted(d.glob("*.yaml")):
             data = yaml.safe_load(yml.read_text(encoding="utf-8")) or {}
-            raw_t += data.get("techniques", [])
             raw_p += data.get("packages", [])
+
         schema_path = d / "schema" / "catalog.schema.json"
         if validate and schema_path.exists():
             validate_catalog(raw_t, raw_p, schema_path)

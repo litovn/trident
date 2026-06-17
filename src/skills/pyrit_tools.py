@@ -1,7 +1,8 @@
 """PyRIT primitives exposed as Copilot SDK tools.
 
-Architecture (ADR-revisit, v0.4): catalog techniques are *skills* (SKILL.md,
-see ``skillgen.py``); PyRIT is the *tool* surface the agent composes. Instead
+Architecture (ADR-revisit, v0.4): catalog techniques are *skills* (each authored
+as a ``SKILL.md`` — the single source of truth); PyRIT is the *tool* surface the
+agent composes. Instead
 of one ``@define_tool`` per technique we expose three technique-agnostic
 primitives:
 
