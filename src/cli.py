@@ -1,20 +1,12 @@
 import argparse
 import asyncio
+import yaml
 import json
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 
-import yaml
-
-# Load .env (FOUNDRY_ENDPOINT, FOUNDRY_MODEL_DEPLOYMENT, ...) BEFORE the
-# Coordinator client reads its settings. python-dotenv is optional: when
-# absent the user must export the vars manually.
-try:
-    from dotenv import load_dotenv
-
-    load_dotenv()
-except ImportError:
-    pass
+load_dotenv()
 
 from .core.client import TridentClient
 from .core.models import Manifest, Scorecard, TargetProfile

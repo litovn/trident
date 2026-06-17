@@ -61,7 +61,7 @@ _PHASE_TO_MODES: dict[Phase, set[Mode]] = {
 # Catalog types
 # ──────────────────────────────────────────────────────────────────────────
 class TechniqueConfig(BaseModel):
-    """One catalog entry (schema v0.3). A PyRIT-backed skill, tagged OWASP × MITRE ATLAS."""
+    """One catalog entry (schema v0.3). A PyRIT-backed skill, tagged OWASP x MITRE ATLAS."""
     id: str
     name: str
     desc: str = ""
