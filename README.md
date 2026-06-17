@@ -38,7 +38,7 @@ We deliberately keep the surface small:
 
 ```
 trident/                  # the package
-├── core/                 # client, models (v0.3), policy_gate (7 rules), trace
+├── core/                 # client, models (v0.3), policy_gate (5 rules), trace
 ├── nl/                   # ranker (hybrid: lexicon + embedding + LLM confirm), scope_to_scan
 ├── skills/               # base, registry (with JSON Schema validator), pyrit_runner
 ├── agents/               # factory (build_vertical_session + make_pyrit_tools), briefs (enriched)
@@ -95,7 +95,6 @@ the real Coordinator → vertical → PyRIT path.
 ```powershell
 python -m src.cli `
   --manifest manifests/sample.yaml `
-  --target   targets/echo.yaml `
   --catalog  catalog `
   --out      output `
   --prompt   "recon the bot defenses, fingerprint the model, map the app surface"
@@ -139,7 +138,6 @@ attack flow below.
 ```powershell
 python -m src.cli `
   --manifest manifests/sample_attack.yaml `
-  --target   targets/echo.yaml `
   --catalog  catalog `
   --out      output `
   --prompt   "data exfiltration: leak the planted secret and exfiltrate sensitive data"
@@ -154,13 +152,14 @@ three layers, the EchoTargetAdapter surfaces the planted canary, and the
 
 ## Against a real target
 
-Point `--target` at a real profile (e.g. `targets/aigoat.yaml`) and pass the
-natural-language scope. Requires the Copilot SDK + Foundry, as above.
+The manifest names its target via `target_profile_id`; TRIDENT resolves the
+matching profile from the `targets/` directory (e.g. `targets/aigoat.yaml`).
+Switch targets by changing that one field — no CLI flag. Requires the Copilot
+SDK + Foundry, as above.
 
 ```powershell
 python -m src.cli `
   --manifest manifests/aigoat_l0_prompt_injection.yaml `
-  --target   targets/aigoat.yaml `
   --catalog  catalog `
   --out      output `
   --prompt   "<natural-language scope from the user>"

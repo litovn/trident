@@ -39,9 +39,27 @@ def _build_target(profile: TargetProfile, canary: str | None) -> TargetAdapter:
     raise ValueError(f"Unknown target profile id: {profile.id!r}")
 
 
+def _load_target_profile(targets_dir: Path, profile_id: str) -> TargetProfile:
+    """Resolve the TargetProfile named by the manifest's ``target_profile_id``.
+
+    The manifest is the campaign spec: it names its target by id, and TRIDENT
+    resolves the matching profile from ``targets_dir`` (matched on the YAML ``id``
+    field, not the filename).
+    """
+    candidates = sorted(targets_dir.glob("*.yaml"))
+    for path in candidates:
+        if _load_yaml(path).get("id") == profile_id:
+            return TargetProfile.model_validate(_load_yaml(path))
+    available = ", ".join(sorted(filter(None, (_load_yaml(p).get("id") for p in candidates)))) or "(none)"
+    raise SystemExit(
+        f"target profile id {profile_id!r} (from manifest) not found under {targets_dir}/ "
+        f"— available ids: {available}"
+    )
+
+
 async def _run(args: argparse.Namespace) -> None:
     manifest = Manifest.model_validate(_load_yaml(Path(args.manifest)))
-    target_profile = TargetProfile.model_validate(_load_yaml(Path(args.target)))
+    target_profile = _load_target_profile(Path(args.targets_dir), manifest.target_profile_id)
     registry = SkillRegistry().load_dir(Path(args.catalog))
 
     out_dir = Path(args.out)
@@ -83,7 +101,9 @@ async def _run(args: argparse.Namespace) -> None:
 def main() -> None:
     p = argparse.ArgumentParser(prog="trident", description="TRIDENT — red-teaming accelerator")
     p.add_argument("--manifest", required=True, help="Path to manifest YAML")
-    p.add_argument("--target", required=True, help="Path to TargetProfile YAML")
+    p.add_argument("--targets-dir", default="targets",
+                   help="Directory of TargetProfile YAMLs (default: targets); the manifest's "
+                        "target_profile_id selects which profile to use")
     p.add_argument("--catalog", default="catalog", help="Catalog directory (default: catalog)")
     p.add_argument("--prompt", required=True, help="NL prompt describing what to test")
     p.add_argument("--out", default="output", help="Output directory (default: output)")

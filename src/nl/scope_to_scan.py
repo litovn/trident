@@ -39,14 +39,11 @@ def scope_to_scan(
     skipped: list[dict[str, Any]] = []
     seen: set[str] = set()
 
-    # ADR-008: the manifest declares constraints, not the plan.
-    # When `manifest.layers` is empty the ranker decides which layers to
-    # exercise (driven by the NL prompt); when populated, it pins the scope.
-    active_layers: list[Layer] = (
-        list(manifest.layers)
-        if manifest.layers
-        else [lyr for lyr in scope.techniques_by_layer if scope.techniques_by_layer[lyr]]
-    )
+    # ADR-008: the manifest declares constraints, not the plan. Layer selection
+    # is driven entirely by the NL prompt via the ranker (scope.techniques_by_layer).
+    active_layers: list[Layer] = [
+        lyr for lyr in scope.techniques_by_layer if scope.techniques_by_layer[lyr]
+    ]
 
     for layer in active_layers:
         for tid in scope.techniques_by_layer.get(layer, []):
@@ -56,9 +53,6 @@ def scope_to_scan(
 
             if tid in manifest.technique_denylist:
                 skipped.append({"id": tid, "layer": layer, "reason": "denylist"})
-                continue
-            if manifest.technique_allowlist and tid not in manifest.technique_allowlist:
-                skipped.append({"id": tid, "layer": layer, "reason": "allowlist"})
                 continue
 
             tech = registry.get(tid)
