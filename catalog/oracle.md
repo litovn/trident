@@ -28,6 +28,10 @@ success_oracle:
 2. **Plant** — the **adapter** writes the token into the target's data/config via `plant_surface`
    (a poisoned KB doc, a seeded record, the test system prompt). Planting touches the target, so it
    lives in the adapter, not the generic core. (White-box setup only, allowed for validation.)
+   Wired as a pre-flight step in `cli.py` (`_plant_canary`): if the oracle has a canary and a
+   `plant_surface`, it calls the adapter's optional `plant(surface, token)` before the attack.
+   Echo ingests into an in-memory KB; the HTTP adapter POSTs to the surface endpoint (best-effort;
+   body field defaults to `content`, override via `surfaces.<surface>.body_field`).
 3. **Resolve** — `resolve_placeholders(objective, oracle.context(target_name))` fills
    `{planted_secret}` (= the canary) and `{target_name}` in the technique's objectives.
 4. **Detect** — after the attack, `oracle.detect(scorer, response)` → a deterministic `Verdict`.

@@ -39,6 +39,25 @@ def _build_target(profile: TargetProfile, canary: str | None) -> TargetAdapter:
     raise ValueError(f"Unknown target profile id: {profile.id!r}")
 
 
+async def _plant_canary(target: TargetAdapter, oracle: SuccessOracle) -> None:
+    """Pre-flight: if the campaign uses a planted canary, write it into the target
+    via the configured ``plant_surface`` so ``exfil_canary`` can fire for real.
+
+    Best-effort and target-agnostic: targets without a ``plant`` capability (or
+    without a ``plant_surface`` in the oracle config) are silently skipped.
+    """
+    if not oracle.canary:
+        return
+    surface = oracle.cfg.get("canary", {}).get("plant_surface")
+    if not surface:
+        return
+    plant = getattr(target, "plant", None)
+    if plant is None:
+        return
+    ok = await plant(surface, oracle.canary)
+    print(f"[pre-flight] canary plant via {surface!r}: {'ok' if ok else 'skipped/failed'}")
+
+
 def _load_target_profile(targets_dir: Path, profile_id: str) -> TargetProfile:
     """Resolve the TargetProfile named by the manifest's ``target_profile_id``.
 
@@ -73,6 +92,7 @@ async def _run(args: argparse.Namespace) -> None:
     client = TridentClient()
     await client.start()
     try:
+        await _plant_canary(target, oracle)
         coord = Coordinator(client, manifest, target, target_profile, registry, trace,
                             oracle=oracle)
 

@@ -30,6 +30,7 @@ class AIGoatTargetAdapter:
         self.endpoint = profile.base_url
         self.capabilities = list(profile.capabilities)
         self.canary = canary
+        self._surfaces = dict(profile.surfaces)
 
         chat_surface = profile.surfaces.get("chat", {})
         self._chat_path = chat_surface.get("path", "/api/chat")
@@ -67,6 +68,31 @@ class AIGoatTargetAdapter:
                 raise RuntimeError(f"AIGoat login returned no token: {data!r}")
             self._token = token
             return token
+
+    async def plant(self, surface: str, content: str) -> bool:
+        """Best-effort: write a honeytoken into the target via the given abstract
+        surface (e.g. ``retrieval_ingest`` -> ``/api/knowledge-base``) so a later
+        attack can attempt to exfiltrate it. Returns True on a 2xx response.
+
+        The request body field defaults to ``content``; override per surface in the
+        profile (``surfaces.<surface>.body_field``) if the target's API differs.
+        """
+        surf = self._surfaces.get(surface)
+        if not surf or not surf.get("path"):
+            return False
+        token = await self._ensure_token()
+        field = surf.get("body_field", "content")
+        try:
+            resp = await self._client.request(
+                surf.get("method", "POST").upper(),
+                surf["path"],
+                headers={"Authorization": f"Bearer {token}"},
+                json={field: content},
+            )
+            resp.raise_for_status()
+            return True
+        except httpx.HTTPError:
+            return False
 
     async def send(self, prompt: str, **kw: Any) -> TargetResponse:
         token = await self._ensure_token()
