@@ -223,4 +223,13 @@ Wiring: dispatch.py ora porta success nel finding; coordinator.py espone self.la
         5. Nuovo flusso — In coordinator.py: COORDINATOR_PROMPT riscritto (select_scope → dispatch in-scope → sintesi cross-layer), intake() delega al seam, run_agentic registra [select_tool, *dispatch_tools] senza serializzare il piano nel prompt, poi chiama il floor e setta last_plan.  
 
 
-# NUOVO FLUSSO NEI FILE
+# RANKER REVISIONE
+attualemtne il semantic ranker egna sia pacchetti sia tecniche e ha già un ramo package-first (soglia 0.55), ma il fallback a tecniche domina in pratica --> NO GOOD
+
+## Step 1
+Cosa ho costruito (additivo, niente rimosso)
+- PackageCandidate in models.py: tipo front-end-agnostic con id, name, axis, score, percent, layers, technique_ids, query_budget, max_intensity, rationale. model_dump() dà già un payload JSON pronto per la GUI futura.
+- rank_packages(nl, registry, top_n=4) in ranker.py: ranking solo-pacchetti — cosine sugli intent_examples dei pacchetti + lane alias, ordinati per punteggio, restituisce sempre i top-4 da packages.yaml.
+- scope_from_package(package, registry): proietta il pacchetto scelto in uno Scope (tecniche raggruppate per layer) pronto per scope_to_scan.
+Non ho ancora toccato rank()/coordinator/CLI — il path esistente resta funzionante finché non lo ricabliamo (step 3-4).
+

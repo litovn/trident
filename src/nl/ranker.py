@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Protocol, Sequence
 
-from ..core.models import Layer, Package, Scope, TechniqueConfig
+from ..core.models import Layer, Package, PackageCandidate, Scope, TechniqueConfig
 from ..skills.registry import SkillRegistry
 
 
@@ -188,7 +188,42 @@ class ScopeRanker:
         return [self.registry.techniques[tid]
                 for tid in selection.selected_package.techniques
                 if tid in self.registry.techniques]
+    # ---- package-only ranking (top-N for HITL selection) ----------------
 
+    def _package_candidate(self, scored: Scored) -> PackageCandidate:
+        """Resolve a scored package id into a display-ready PackageCandidate."""
+        pkg = self.registry.packages[scored.id]
+        layers: list[Layer] = []
+        for tid in pkg.techniques:
+            t = self.registry.techniques.get(tid)
+            if t is not None and t.layer not in layers:
+                layers.append(t.layer)
+        pct = max(0, min(100, round(scored.score * 100)))
+        return PackageCandidate(
+            id=pkg.id, name=pkg.name, axis=pkg.axis,
+            score=round(scored.score, 3), percent=pct,
+            layers=layers, technique_ids=list(pkg.techniques),
+            query_budget=pkg.query_budget, max_intensity=pkg.max_intensity,
+            rationale=f"semantic match {pct}% on package intent",
+        )
+
+    def rank_packages(self, query: str, *, top_n: int = 4) -> list[PackageCandidate]:
+        """Package-only ranking: score every catalog package against the prompt and
+        return the top-N candidates (highest score first). The prompt is usually
+        vague, so we surface N options for a human to choose from (HITL) rather
+        than auto-committing to one. Uses the same two lanes as `rank`: cosine
+        over package intent + a lexicon boost for jargon/aliases (e.g. a typed
+        'jailbreak' forces PKG-GUARDRAIL up)."""
+        qvec = self.embedder.embed([query])[0]
+        _, hit_p = self._alias_hits(query)
+
+        def pscore(i: str) -> float:
+            s = _cosine(qvec, self._pkg_vecs[i])
+            return max(s, self.alias_boost) if i in hit_p else s
+
+        scored = sorted((Scored(i, pscore(i)) for i in self._pkg_ids),
+                        key=lambda s: s.score, reverse=True)
+        return [self._package_candidate(s) for s in scored[:top_n]]
 
 # ──────────────────────────────────────────────────────────────────────────
 # Azure OpenAI implementations
@@ -336,3 +371,31 @@ def make_ranker(registry: SkillRegistry, *, offline: bool | None = None, **kwarg
 def rank(nl: str, registry: SkillRegistry, *, offline: bool | None = None) -> Scope:
     """Convenience: build a ranker and return a Scope (used by the Coordinator)."""
     return make_ranker(registry, offline=offline).rank(nl).to_scope()
+
+
+def rank_packages(nl: str, registry: SkillRegistry, *, top_n: int = 4,
+                  offline: bool | None = None) -> list[PackageCandidate]:
+    """Convenience: build a ranker and return the top-N package candidates for the
+    prompt. Package-only selection — the candidates come straight from
+    ``packages.yaml`` (see `ScopeRanker.rank_packages`)."""
+    return make_ranker(registry, offline=offline).rank_packages(nl, top_n=top_n)
+
+
+def scope_from_package(package: Package, registry: SkillRegistry) -> Scope:
+    """Project a chosen package into the Scope consumed by `scope_to_scan`: group
+    the package's techniques by layer. This is a pure projection — deferred /
+    untargetable filtering stays in `scope_to_scan` (the deterministic floor)."""
+    by_layer: dict[Layer, list[str]] = {}
+    for tid in package.techniques:
+        t = registry.techniques.get(tid)
+        if t is None:
+            continue
+        by_layer.setdefault(t.layer, []).append(tid)
+    return Scope(
+        selection_mode="package",
+        selected_package=package.id,
+        packages=[package.id],
+        techniques_by_layer=by_layer,
+        confidence=1.0,  # a human authorized this exact package
+        rationale=f"package {package.id} selected",
+    )
