@@ -15,7 +15,7 @@ packages:
     name: "Quick scan"
     axis: profile
     aliases: ["quick scan", "fast check", "smoke test"]
-    intent_examples: ["give it a quick check", "fast scan", "light test without going deep"]
+    intent_examples: ["give it a quick check", "fast scan", "litestght  without going deep"]
     techniques: [TRD-PRM-001, TRD-PRM-002, TRD-APP-002, TRD-MOD-001]
     limits: { max_intensity: moderate, query_budget: 50 }
     modes: [recon, attack]

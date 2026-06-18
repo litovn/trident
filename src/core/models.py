@@ -155,6 +155,25 @@ class Package(BaseModel):
     def alias_terms(self) -> list[str]:
         return [str(a).lower() for a in self.aliases]
 
+class PackageCandidate(BaseModel):
+    """One ranked package proposal: ranker → (HITL selection) → scope_to_scan.
+
+    Package-only ranking surfaces the top-N of these for a human to choose from
+    (the operator prompt is usually vague). Front-end-agnostic: it carries
+    everything the CLI now — or a GUI later — needs to render the choice, plus the
+    package ``id`` the selection resolves to. ``model_dump()`` yields a JSON-ready
+    payload for a GUI.
+    """
+    id: str
+    name: str
+    axis: Axis = "profile"
+    score: float = 0.0                 # raw semantic score in [0, 1]
+    percent: int = 0                   # score as 0–100 for display
+    layers: list[Layer] = Field(default_factory=list)
+    technique_ids: list[str] = Field(default_factory=list)
+    query_budget: Optional[int] = None
+    max_intensity: Optional[str] = None
+    rationale: str = ""
 
 # ──────────────────────────────────────────────────────────────────────────
 # Target profile (schema v0.3 — declarative; the adapter implements I/O)
