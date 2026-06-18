@@ -25,7 +25,9 @@ class TridentClient:
         from copilot.session import PermissionHandler  # type: ignore
 
         self._sdk_perm = PermissionHandler
-        self._token_provider = self._build_token_provider()
+        # A static FOUNDRY_API_KEY needs no Azure-AD credential; only build the
+        # token provider when we'll actually mint a bearer (az login / Managed Identity).
+        self._token_provider = None if self.settings.api_key else self._build_token_provider()
         logger.info(
             "TridentClient: Foundry endpoint=%s deployment=%s (Foundry credit)",
             self.settings.endpoint, self.settings.model_deployment,

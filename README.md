@@ -72,14 +72,27 @@ manifests/                # Rules of Engagement as Code (ADR-008)
 ## Install
 
 ```powershell
-pip install -e ".[dev]"
-# For the real (agentic) run, also:
-pip install -e ".[sdk,real]"
+# Full install (all capabilities): Copilot SDK + ranker + PyRIT + dev tooling
+pip install -e ".[sdk,ranker,real,dev]"
 ```
 
-> Python 3.12+ required (tested on 3.14.4).
+Extras (compose as needed):
+
+| Extra | Pulls in | Needed for |
+|---|---|---|
+| `sdk` | `github-copilot-sdk`, `azure-identity` | the agentic Coordinator + vertical sessions |
+| `ranker` | `openai`, `azure-identity` | Phase-1 NL→scope ranker (Azure OpenAI) |
+| `real` | `pyrit` | the PyRIT execution surface (converters, judged scorers, orchestrators) |
+| `dev` | `pytest`, `build` | tests + packaging |
+
+The base install (no extras) is enough to import the catalog/registry/oracle and
+the deterministic core. `requirements.txt` remains a pinned lockfile of a known-good
+environment.
+
+> Python 3.11+ required (tested on 3.11.9).
 > Every run goes through the agentic Coordinator and **requires Microsoft
 > Foundry** (`FOUNDRY_ENDPOINT` + `az login`, or `FOUNDRY_API_KEY`). See `.env.example`.
+
 
 ---
 

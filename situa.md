@@ -131,10 +131,47 @@ Campi morti in config.py
 # 7. Coordinator(...).run_agentic(prompt)            [orchestrator/coordinator.py]
 Ma oracle.detect ritorna kind="confirmed" anche per i negativi confermati (es. "nessun canary trovato" → success=False, kind=confirmed). Quindi un check deterministico fallito gonfia oracle_hits.
 
+### SCOPE_TO_SCAN
+        Hai detto "il coordinator istanzia i 3 tool agenti". A livello SDK è leggermente impreciso, e un ingegnere in platea lo nota: i tool sono pre-registrati alla creazione della sessione — l'LLM li invoca, non li istanzia su richiesta. Le sessioni sub-agente vengono create quando il tool viene chiamato (build_vertical_session). Quindi la formulazione tecnicamente difendibile è: "il coordinator invoca autonomamente i suoi sub-agenti, ciascuno dei quali apre una sessione recintata per layer". Non "istanzia i tool".
+
+        La tesi stessa di TRIDENT è la "bounded autonomy" (ADR-008/017): l'agente ragiona liberamente, ma ogni azione concreta passa un gate deterministico attorno a cui l'LLM non può ragionare.
+
+        Quindi max agency + guardrail duri non è un compromesso — È la tesi. E come frase da pitch è migliore:
+
+        "Orchestrazione multi-agente autonoma dentro un perimetro di compliance imposto dal codice."
+
+        Un acquirente enterprise/security vuole esattamente questo: autonomia che provabilmente non può deragliare, non "è tutto autonomo, fidati". I guardrail non diluiscono la storia — la rendono vendibile. È controintuitivo ma è così: l'"agente che potrebbe andare fuori dai binari" spaventa; l'"agente autonomo con un pavimento deterministico" convince.
+
+        Superficie agentica su pavimento deterministico:
+
+        Superficie (la narrativa, vera): il coordinator riceve il prompt → chiama select_scope → decide la strategia → invoca i dispatch → correla i report. Ogni verbo è autentico.
+        Pavimento (le garanzie): validazione contro lo ScanPlan filtrato, idempotenza per-layer, fallback deterministico se un tool non viene chiamato, asyncio.gather per l'insieme scelto, logging strutturato + Trace.
+        La capability è genuinamente autonoma (pitch onesto), il pavimento garantisce che giri uguale a ogni demo.
+
+### DECISION
+- scope_to_scan → resta deterministico, NON diventa mai un tool, gira SEMPRE. È il pavimento. Quattro motivi:
+
+        Zero beneficio dall'agency: è logica meccanica (sottoinsiemi e conteggi), non c'è nulla da "ragionare".
+        Applica la sicurezza: gating di targetabilità (needs_capabilities ⊆ capabilities), denylist, mode, deferred, cardinalità — è esattamente "il gate attorno a cui l'LLM non può ragionare".
+        Renderlo un tool sarebbe pericoloso: il coordinator potrebbe saltarlo o manipolarlo → rompe la bounded-autonomy (ADR-008/017), e potrebbe persino violare l'ADR-021 (scegliere esattamente 2 layer).
+        Costruisce il VerticalConfig — proiezione meccanica, nessuna intelligenza richiesta.
+
+- ranker.rank → è la superficie agentica. È la parte "ho analizzato il prompt" (la tua narrativa), ha già la corsia LLM, e la sua varianza è a basso rischio perché recintata a valle.
+
+Il punto cruciale: scope_to_scan è incapsulato dentro il tool — gira sempre, deterministico, non è un tool separato che si possa saltare. L'agency del coordinator = decidere di chiamare select_scope e ragionare sul risultato già filtrato; non vede mai uno scope non-gated.
+
+⚠️ Da non fare: esporre rank da solo. Darebbe al coordinator uno Scope non filtrato, e dovresti reintrodurre il gating da un'altra parte.
+
+        ranker = l'intelligenza che il coordinator impugna (tool). scope_to_scan = il guardrail a cui il coordinator è sottoposto (pavimento, sempre attivo).
 
 
 # 8. estrai scorecard dalla trace → correlate        [reports/correlator.py]
-
+I findings
+- F-REP-1 — Il pezzo forte è uno stub. potential_chains=[] è la correlazione cross-layer in catene ATLAS, il differenziatore #1 di TRIDENT. Non è costruita. = G-CO-3/C1.
+- F-REP-2 — La copertura è finta. {in_scope, tested} ri-copia la stessa lista di layer. La "metrica di copertura onesta" (un pilastro del pitch) è vapore. Ma il dato onesto esiste già: scope_to_scan produce skipped con i motivi (manca capability, denylist, ecc.) — basta cucirlo nel report. = C3.
+- F-REP-3 — L'HTML è JSON in un box. Non presentabile. Per una demo questo è il deliverable visibile: serve un template vero (tabella findings, severità, tag OWASP/ATLAS, catene, schede per layer). = pezzo demo di G-CO-3.
+- F-REP-4 — La fuga di layering del cli (la vecchia F3): l'estrazione scorecard + l'iniezione di coordinator_summary vivono in cli.py, non in reports/. Da spostare in un assemblatore (assemble_report(trace, summary)).
+- F-REP-5 — Per le catene serve più delle scorecard. Per costruire C1 servono i dettagli per-finding (tecnica→owasp→atlas→successo+evidenza), che stanno nella trace (le findings già portano technique_id/verdict/severity). Quindi C1 = il correlator legge i dati per-finding e li sequenzia per ordine di tattica ATLAS.
 
 # 9. render(corr, html)                              [reports/html_report.py]
 
