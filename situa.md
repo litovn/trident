@@ -165,7 +165,8 @@ Il punto cruciale: scope_to_scan è incapsulato dentro il tool — gira sempre, 
         ranker = l'intelligenza che il coordinator impugna (tool). scope_to_scan = il guardrail a cui il coordinator è sottoposto (pavimento, sempre attivo).
 
 
-# 8. estrai scorecard dalla trace → correlate        [reports/correlator.py]
+# 8a. estrai scorecard dalla trace → correlate        [reports/correlator.py]
+# 8b. render(corr, html)                              [reports/html_report.py]
 I findings
 - F-REP-1 — Il pezzo forte è uno stub. potential_chains=[] è la correlazione cross-layer in catene ATLAS, il differenziatore #1 di TRIDENT. Non è costruita. = G-CO-3/C1.
 - F-REP-2 — La copertura è finta. {in_scope, tested} ri-copia la stessa lista di layer. La "metrica di copertura onesta" (un pilastro del pitch) è vapore. Ma il dato onesto esiste già: scope_to_scan produce skipped con i motivi (manca capability, denylist, ecc.) — basta cucirlo nel report. = C3.
@@ -186,9 +187,40 @@ html_report.py — da <pre> JSON a template presentabile: KPI header, sezione ca
 
 Wiring: dispatch.py ora porta success nel finding; coordinator.py espone self.last_plan; cli.py chiama la nuova firma correlate(scorecards_from_trace(trace), coord.last_plan, registry, summary=...).
 
-# 9. render(corr, html)                              [reports/html_report.py]
+
+# LAVORONE SUL COORDINATOR. Punto 7 - analisi, ora lavoro
+- Coordinator resta agentico (non fan-out deterministico).
+- Livello target = L1 (orchestra + correla). L2 (recon→attack adattivo) dopo; L3 mai (onestà: "correlated post-hoc", mai "emergent execution").
+- Forma = bounded autonomy = il pitch: "autonomous multi-agent orchestration inside a code-enforced compliance perimeter."
+
+1. select_scope tool (D-RANK b) — nuovo SDK tool. Il corpo esegue rank() + scope_to_scan() e ritorna lo ScanPlan già gated + skipped[reasons]. scope_to_scan resta dentro il tool (gira sempre, mai skippabile, mai un tool a sé). Non esponiamo rank() da solo (darebbe al coordinator uno Scope non-gated). Il confermatore a 3 lane resta. È la narrazione "ho analizzato il prompt → ho scelto PKG-EXFIL perché…".
+
+2. G-CO-1 — basta JSON-through-LLM (dipende da 1). Oggi i dispatch_*_agent prendono vertical_config_json: str e fanno VerticalConfig.model_validate_json(...) — fragile. Nuovo: select_scope stasha lo ScanPlan (in SkillContext o closure); i tool dispatch non prendono più argomenti JSON → tirano la loro VerticalConfig dallo stash. Il coordinator decide solo quale chiamare.
+
+3. G-CO-2 — report reale dell'agente (parallelo a 2). Oggi _run_layer scarta la risposta finale di session.send_and_wait (torna solo la scorecard ricostruita dal trace). Nuovo: catturiamo quella risposta come narrativa dell'agente e la ritorniamo accanto alla scorecard (narrativa + numeri duri).
+
+4. Pavimento deterministico (le guardrail che l'LLM non può aggirare) (dipende da 1-3):
+        R4 — il tool dispatch valida layer/tecniche contro lo ScanPlan gated, rifiuta se fuori piano.
+        R3 — guard di idempotenza per-layer (rifiuta il re-dispatch di un layer già girato → no doppio budget/trace).
+        R1 — fallback deterministico: se l'LLM non chiama select_scope o salta un dispatch, l'harness lo fa. Garantisce anche che coord.last_plan sia sempre settato per la coverage del report.
+        R2 — fan-out parallelo con asyncio.gather sul set scelto (agency sul quale, determinismo sul come).
+        R6 — logging strutturato di ogni tool-call + il Trace immutabile.
+
+5. Nuovo COORDINATOR_PROMPT (dipende da 1-4) — riscritto per il nuovo flusso: chiama select_scope → decide la strategia → invoca i dispatch tool → sintetizza i findings cross-layer. Via l'istruzione "passing its VerticalConfig JSON".
+
+6. G-CO-3 / C1 / C2 / C3 — GIÀ FATTO ✅. correlate() produce già catene cross-layer, coverage onesta, remediation; l'HTML è presentabile; il summary del coordinator già fluisce in correlate(summary=...). Resta solo da collegarlo al nuovo report dell'agente (G-CO-2).
 
 
-Semnatic ranking?
-Copilot SDK funziona?
-Coordinator lancia in parallaleo se stesso usando tool specializzati?
+      Cosa è cambiato
+        1. select_scope tool + stash — Nuovo scope_tool.py: select_scope_plan() è il seam deterministico (rank() + scope_to_scan() + stash in ctx.scan_plan), condiviso da tool e floor. make_select_scope_tool() lega il prompt al build-time (l'LLM decide quando analizzare, non cosa — così la lane lessicale del ranker resta deterministica). scope_to_scan è bundlato dentro, mai esposto da solo. In base.py: SkillContext ora ha scan_plan (stash) e dispatched_layers (idempotenza).
+
+        2. G-CO-1 — basta JSON-through-LLM — In dispatch.py il vecchio _run_layer (closure, prendeva JSON) è diventato run_layer() module-level che tira la VerticalConfig dallo stash. I 3 dispatch_*_agent ora prendono solo un rationale opzionale.
+
+        3. G-CO-2 — report reale dell'agente — run_layer cattura response.data.content come narrativa dell'agente e la ritorna accanto alla scorecard ({**scorecard, agent_report}), salvandola anche nel trace.
+
+        4. Pavimento deterministico — R4 (rifiuta layer fuori dal piano gated), R3 (idempotenza per-layer), R1 (_ensure_floor fa scoping deterministico se l'LLM salta select_scope e dispaccia i verticali mancanti), R2 (asyncio.gather sul set mancante), R6 (logging strutturato per dispatch).
+
+        5. Nuovo flusso — In coordinator.py: COORDINATOR_PROMPT riscritto (select_scope → dispatch in-scope → sintesi cross-layer), intake() delega al seam, run_agentic registra [select_tool, *dispatch_tools] senza serializzare il piano nel prompt, poi chiama il floor e setta last_plan.  
+
+
+# NUOVO FLUSSO NEI FILE

@@ -1,7 +1,7 @@
-from dataclasses import dataclass
-from typing import Awaitable, Callable
+from dataclasses import dataclass, field
+from typing import Awaitable, Callable, Optional
 
-from ..core.models import Action, ExecutionResult, TechniqueConfig
+from ..core.models import Action, ExecutionResult, ScanPlan, TechniqueConfig
 from ..core.policy_gate import PolicyGate
 from ..core.trace import Trace
 from ..targets.adapter import TargetAdapter
@@ -22,6 +22,13 @@ class SkillContext:
     # `client.create_session(skill_directories=[...])` by the SDK wiring so the
     # Copilot agent can match techniques as skills at runtime.
     skills_dir: str = "catalog/skills_catalog"
+    # The policy-gated ScanPlan, stashed by the `select_scope` tool so the
+    # dispatch tools can pull each layer's VerticalConfig WITHOUT round-tripping
+    # JSON through the LLM (G-CO-1). None until select_scope (or the floor) runs.
+    scan_plan: Optional[ScanPlan] = None
+    # Layers already dispatched this campaign — the idempotency floor (R3): the
+    # dispatch tools refuse to re-run a layer (no double budget / double trace).
+    dispatched_layers: set[str] = field(default_factory=set)
 
 
 def make_skill_handler(tech: TechniqueConfig, ctx: SkillContext) -> SkillHandler:

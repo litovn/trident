@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import logging
 import yaml
 import json
 import os
@@ -7,6 +8,10 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
+logging.basicConfig(
+    level=getattr(logging, os.environ.get("TRIDENT_LOG_LEVEL", "INFO").upper(), logging.INFO),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 from .core.client import TridentClient
 from .core.models import Manifest, TargetProfile

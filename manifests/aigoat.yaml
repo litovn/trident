@@ -1,7 +1,7 @@
 # AIGoat L0 — direct prompt injection smoke run.
 # Layer + technique selection are driven by the --prompt via the ranker (ADR-008);
 # keep the prompt specific (e.g. mention direct prompt injection / TRD-PRM-002).
-campaign_id: aigoat-l0-prompt-injection
+campaign_id: aigoat
 mode: attack
 target_profile_id: aigoat
 technique_denylist: []
