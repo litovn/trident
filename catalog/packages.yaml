@@ -1,11 +1,11 @@
 # TRIDENT — Attack packages (curated bundles of catalog techniques)
-# Schema v0.3. English. Target-agnostic.
 # A package = a curated list of technique IDs + safe limits + which modes it runs in.
 # The matcher resolves a user prompt to a package (package-first) or to individual techniques.
 # Layer-selection rule {1 OR all 3, never 2} lives in the scope/selection logic, not here.
 #
 # package fields:
-#   id, name, axis, aliases, intent_examples, techniques[], limits{max_intensity, query_budget}, modes[]
+#   id, name, description, axis, aliases, intent_examples, techniques[], limits{max_intensity, query_budget}, modes[]
+
 catalog_version: 0.3
 
 packages:
@@ -13,6 +13,7 @@ packages:
   # ---------- AXIS: PROFILES (one-click defaults) ----------
   - id: PKG-QUICK
     name: "Quick scan"
+    description: "Lightweight smoke test that fires a handful of high-signal techniques across all three layers (prompt, app, model) for a fast risk read. Moderate intensity, tight 50-query budget; runs in recon or attack. Use as the default first pass when you want a quick check, not deep coverage."
     axis: profile
     aliases: ["quick scan", "fast check", "smoke test"]
     intent_examples: ["give it a quick check", "fast scan", "litestght  without going deep"]
@@ -22,6 +23,7 @@ packages:
 
   - id: PKG-OWASP
     name: "OWASP LLM sweep"
+    description: "Standards-aligned sweep covering the OWASP LLM Top 10 risk categories with prompt-injection, jailbreak, RAG/indirect-injection, tool-abuse, info-disclosure and model-layer checks. Moderate intensity, 150-query budget; recon or attack. Pick this for compliance-style coverage of the recognised application risks."
     axis: profile
     aliases: ["owasp sweep", "owasp llm top 10", "cover the owasp risks"]
     intent_examples: ["cover all OWASP risks", "sweep the OWASP LLM Top 10", "test the standard categories"]
@@ -31,6 +33,7 @@ packages:
 
   - id: PKG-ATLAS
     name: "ATLAS kill-chain"
+    description: "End-to-end adversary simulation sequenced along the MITRE ATLAS kill-chain — Discovery → Execution → Persistence → Exfiltration — chaining model recon, jailbreak, indirect injection and data leakage like a real attacker. Difficult intensity, 200-query budget; recon or attack. Use to demonstrate a realistic multi-stage attack path rather than isolated findings."
     axis: profile
     aliases: ["atlas kill-chain", "full attack chain", "end-to-end attack"]
     intent_examples: ["simulate a complete attack", "kill-chain from recon to exfil", "chain techniques like a real attacker"]
@@ -40,6 +43,7 @@ packages:
 
   - id: PKG-360
     name: "Full 360"
+    description: "Exhaustive run of every targetable, non-deferred technique across all three layers for maximum coverage. Excludes deferred-mvp model techniques (TRD-MOD-004/005/006) since the cumulative scorer is post-MVP. Difficult intensity, large 400-query budget; recon or attack. Pick when you want total coverage and have the query budget and a sandboxed target to support it."
     axis: profile
     aliases: ["full 360", "everything", "exhaustive test", "total coverage"]
     intent_examples: ["exhaustive test", "run everything", "full 360 coverage"]
@@ -55,6 +59,7 @@ packages:
   # ---------- AXIS: PER-LAYER (single-layer option; rule {1 or 3}) ----------
   - id: PKG-PROMPT
     name: "Prompt layer only"
+    description: "Single-layer package isolating the input/prompt surface: direct prompt injection, jailbreaks, obfuscation/evasion and prompt-layer recon. Difficult intensity, 150-query budget; recon or attack. Use when the layer-selection rule narrows to the prompt layer alone (e.g. a bare chatbot input with no RAG or tools)."
     axis: layer
     aliases: ["prompt only", "prompt layer", "test the chatbot prompt"]
     intent_examples: ["only test the prompt layer", "attack just the chatbot input"]
@@ -64,6 +69,7 @@ packages:
 
   - id: PKG-APP
     name: "Application layer only"
+    description: "Single-layer package covering the application/integration surface: RAG and indirect injection, tool/agent abuse, output handling, info disclosure and app-layer recon. Difficult intensity, 250-query budget; recon or attack. Use when targeting the wrapper around the model — RAG pipelines, tools and orchestration — rather than the model or raw prompt."
     axis: layer
     aliases: ["application only", "app layer", "rag and tools"]
     intent_examples: ["only test the application layer", "attack the RAG and tools"]
@@ -74,16 +80,19 @@ packages:
 
   - id: PKG-MODEL
     name: "Model layer only"
+    description: "Single-layer package targeting the underlying model through its API: fingerprinting/recon, extraction and adversarial transfer. Difficult intensity, 300-query budget (extraction loops are query-heavy); recon or attack. Use for deep model-behaviour testing when the layer-selection rule isolates the model layer."
     axis: layer
     aliases: ["model only", "model layer", "test the underlying model"]
     intent_examples: ["only test the model layer", "attack the underlying model"]
-    techniques: [TRD-MOD-001, TRD-MOD-002, TRD-MOD-003, TRD-MOD-004, TRD-MOD-005, TRD-MOD-006]
+    # Deferred-mvp (TRD-MOD-004/005/006) excluded by default (cumulative scorer is post-MVP) — kept in sync with PKG-360.
+    techniques: [TRD-MOD-001, TRD-MOD-002, TRD-MOD-003]
     limits: { max_intensity: difficult, query_budget: 300 }
     modes: [recon, attack]
 
   # ---------- AXIS: PER-FOCUS (intent-themed bundles) ----------
   - id: PKG-GUARDRAIL
     name: "Guardrail bypass"
+    description: "Intent-themed bundle focused on defeating safety controls: multi-turn jailbreaks, skeleton-key, obfuscation/evasion and direct injection to get past content filters. Prompt-layer concentrated, difficult intensity, 150-query budget; recon or attack. Pick when the goal is specifically to break guardrails rather than broad coverage."
     axis: focus
     aliases: ["guardrail bypass", "jailbreak", "evade safety", "break the guardrails"]
     intent_examples: ["bypass the guardrails", "jailbreak and evade safety", "get past the content filter"]
@@ -93,6 +102,7 @@ packages:
 
   - id: PKG-EXFIL
     name: "Data exfiltration"
+    description: "Cross-stack data-leakage bundle: prompt-driven disclosure, app-layer info disclosure and RAG context leakage, cost/exfil channels and model-layer extraction. Spans prompt, app and model layers; difficult intensity, 200-query budget; recon or attack. Use to prove sensitive data can be made to leak end to end."
     axis: focus
     aliases: ["data exfiltration", "data leakage", "steal data", "exfil"]
     intent_examples: ["exfiltrate sensitive data", "make it leak data", "data leakage across the stack"]
@@ -102,6 +112,7 @@ packages:
 
   - id: PKG-RAG
     name: "RAG security"
+    description: "Retrieval-pipeline bundle: indirect injection via knowledge-base documents, RAG retrieval manipulation and RAG-surface recon. App-layer focused, difficult intensity, 150-query budget; recon or attack. Pick when the target relies on a knowledge base / retrieval pipeline and you want to test that surface specifically."
     axis: focus
     aliases: ["rag security", "knowledge base attacks", "retrieval security"]
     intent_examples: ["test the RAG security", "attacks on the knowledge base", "retrieval pipeline weaknesses"]
@@ -111,6 +122,7 @@ packages:
 
   - id: PKG-AGENTIC
     name: "Agentic / tool abuse"
+    description: "Agentic-target bundle exercising tool and orchestration abuse: excessive agency, unauthorised tool invocation, output handling and tool-driven exfil (incl. MCP-style integrations). App-layer focused, difficult intensity, 200-query budget; recon or attack. Use against tool-using agents where the risk is unsafe tool actions, not just text output."
     axis: focus
     aliases: ["agentic abuse", "tool abuse", "agent tools", "mcp"]
     intent_examples: ["abuse the agent tools", "agentic attacks", "tool invocation abuse"]
@@ -120,6 +132,7 @@ packages:
 
   - id: PKG-RECON
     name: "Recon only"
+    description: "Passive, non-intrusive surface-mapping bundle: prompt-, app- and model-layer reconnaissance with no payloads fired. Easy intensity, minimal 60-query budget; recon mode ONLY (no attack). Use for Attack-Path Identification — map the attack surface and fingerprint the target without exploitation."
     axis: focus
     aliases: ["recon only", "reconnaissance", "map the surface", "non-intrusive"]
     intent_examples: ["just do recon", "map the attack surface without exploiting", "non-intrusive reconnaissance"]
