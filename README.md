@@ -13,11 +13,32 @@ See `TRIDENT_design_context.md` for the full design rationale and ADRs.
 
 ---
 
+## Demo scope (hackathon)
+
+For the hackathon the goal is a **working, legible recon demo** — not full automation.
+We deliberately keep the surface small:
+
+- ✅ **Recon works today** and is the headline of the demo. See **[Recon — what works
+  and how](#recon--what-works-and-how)** below for the end-to-end flow.
+- ✅ **A minimal target profile is enough.** You do *not* need the full profile schema to
+  onboard a target — just the handful of fields in **[Minimal target profile](#minimal-target-profile)**.
+  `targets/echo.yaml` is the canonical minimal *generic* profile and runs out-of-the-box.
+- ✅ **canary / markup / LLM-judge are generic.** The success-detection suite is
+  target-agnostic (deterministic checks in `targets/oracle.py`, the LLM-judge in
+  `skills/judge_factory.py`) — AIGoat is just one config, never a dependency. The
+  LLM-judge degrades gracefully to an offline heuristic when Foundry is not configured.
+- ✅ **SKILL.md is the single source of truth.** Each technique is authored as a
+  `catalog/skills_catalog/<ID>/SKILL.md` (YAML frontmatter = full machine config,
+  Markdown body = agent-facing procedure). The registry loads techniques straight
+  from these files — there is no separate catalog YAML to keep in sync.
+
+---
+
 ## What's here
 
 ```
 trident/                  # the package
-├── core/                 # client, models (v0.3), policy_gate (7 rules), trace
+├── core/                 # client, models (v0.3), policy_gate (5 rules), trace
 ├── nl/                   # ranker (hybrid: lexicon + embedding + LLM confirm), scope_to_scan
 ├── skills/               # base, registry (with JSON Schema validator), pyrit_runner
 ├── agents/               # factory (build_vertical_session + make_pyrit_tools), briefs (enriched)
@@ -27,9 +48,10 @@ trident/                  # the package
 └── cli.py                # `python -m src.cli --manifest ... --prompt ...`
 
 catalog/                  # 20 techniques + 12 packages + JSON Schema + 5 reference docs
-├── prompt.yaml           # TRD-PRM-001..004 + TRD-PRM-R01
-├── application.yaml      # TRD-APP-001..008 + TRD-APP-R01
-├── model.yaml            # TRD-MOD-001..006  (-004/-005/-006 deferred-mvp)
+├── skills_catalog/       # one SKILL.md per technique — the single source of truth
+│   ├── TRD-PRM-*/SKILL.md    # 5 prompt techniques (frontmatter = full TechniqueConfig)
+│   ├── TRD-APP-*/SKILL.md    # 9 application techniques
+│   └── TRD-MOD-*/SKILL.md    # 6 model techniques (-004/-005/-006 deferred-mvp)
 ├── packages.yaml         # 12 packages: 4 profile + 3 layer + 5 focus
 └── schema/catalog.schema.json     # authoritative; validated at load time
 
@@ -42,7 +64,7 @@ manifests/                # Rules of Engagement as Code (ADR-008)
 ├── sample.yaml           # recon-mode smoke
 └── sample_attack.yaml    # attack-mode smoke
 
-tests/                    # 17 tests (policy gate, ranker, end-to-end dispatch)
+                          # (tests/ suite is not wired on this demo branch — see "Tests" below)
 ```
 
 ---
@@ -50,14 +72,27 @@ tests/                    # 17 tests (policy gate, ranker, end-to-end dispatch)
 ## Install
 
 ```powershell
-pip install -e ".[dev]"
-# For the real (agentic) run, also:
-pip install -e ".[sdk,real]"
+# Full install (all capabilities): Copilot SDK + ranker + PyRIT + dev tooling
+pip install -e ".[sdk,ranker,real,dev]"
 ```
 
-> Python 3.12+ required (tested on 3.14.4).
+Extras (compose as needed):
+
+| Extra | Pulls in | Needed for |
+|---|---|---|
+| `sdk` | `github-copilot-sdk`, `azure-identity` | the agentic Coordinator + vertical sessions |
+| `ranker` | `openai`, `azure-identity` | Phase-1 NL→scope ranker (Azure OpenAI) |
+| `real` | `pyrit` | the PyRIT execution surface (converters, judged scorers, orchestrators) |
+| `dev` | `pytest`, `build` | tests + packaging |
+
+The base install (no extras) is enough to import the catalog/registry/oracle and
+the deterministic core. `requirements.txt` remains a pinned lockfile of a known-good
+environment.
+
+> Python 3.11+ required (tested on 3.11.9).
 > Every run goes through the agentic Coordinator and **requires Microsoft
 > Foundry** (`FOUNDRY_ENDPOINT` + `az login`, or `FOUNDRY_API_KEY`). See `.env.example`.
+
 
 ---
 
@@ -68,28 +103,54 @@ Every campaign goes through the SDK Coordinator and **requires Foundry**
 in-process, so these examples are a cheap end-to-end smoke that still exercises
 the real Coordinator → vertical → PyRIT path.
 
-### Recon
+### Recon — what works and how
 
 ```powershell
 python -m src.cli `
   --manifest manifests/sample.yaml `
-  --target   targets/echo.yaml `
   --catalog  catalog `
   --out      output `
   --prompt   "recon the bot defenses, fingerprint the model, map the app surface"
 ```
 
-Expected: each layer fires its lead recon technique
-(`TRD-PRM-R01`, `TRD-APP-R01`, `TRD-MOD-001`); the deterministic
-`categorical_match` scorer for model fingerprinting marks `verdict: confirmed`.
+Expected: each layer fires its **lead recon technique** —
+
+| Layer | Technique | Scorer | Verdict kind |
+|---|---|---|---|
+| prompt | `TRD-PRM-R01` Guardrail probing | `judged_objective` | `assessed` (LLM-judge, offline fallback) |
+| application | `TRD-APP-R01` RAG/tool surface enumeration | `judged_objective` | `assessed` (LLM-judge, offline fallback) |
+| model | `TRD-MOD-001` Model fingerprinting | `categorical_match` | `confirmed` (deterministic) |
+
 Outputs: `output/smoke-001-recon.html` + `output/smoke-001-recon.trace.jsonl`.
+
+**How recon works, end to end:**
+
+1. **NL → scope.** The ranker maps the prompt to recon techniques; `mode: recon` on the
+   manifest means the policy gate keeps only `phase ∈ {recon, both}` and blocks exploit-only
+   techniques (`rule=mode_intent`).
+2. **scope → scan.** `scope_to_scan` drops any technique whose `needs_capabilities` the target
+   profile doesn't satisfy. Echo advertises `has_chat` → all three leads survive.
+3. **Dispatch.** The Coordinator opens one *fenced* vertical session per layer, exposing only
+   that layer's in-scope skills.
+4. **Execute + score (per technique).** Every skill funnels through `PyritRunner`:
+   `PolicyGate.check` → resolve `{planted_secret}`/`{target_name}` in the objective →
+   `target.send(prompt)` → score. Deterministic scorers (`categorical_match` here) go through
+   the **SuccessOracle** and yield `confirmed` ground truth; judged scorers (`judged_objective`)
+   go through the **LLM-judge**, falling back to the offline refusal heuristic when Foundry is
+   absent (verdict stays `assessed`).
+5. **Report.** The immutable `Trace` feeds `correlator` + `html_report`.
+
+So recon already exercises **both** halves of the generic scoring suite on a generic target:
+the deterministic path (`categorical_match` → `confirmed` model fingerprint) and the
+LLM-judge path (`judged_objective`). The same `SuccessOracle` powers `exfil_canary` /
+`leak_detector` (canary honeytoken) and `output_markup` (executable-markup regex) used by the
+attack flow below.
 
 ### Attack (with canary exfil)
 
 ```powershell
 python -m src.cli `
   --manifest manifests/sample_attack.yaml `
-  --target   targets/echo.yaml `
   --catalog  catalog `
   --out      output `
   --prompt   "data exfiltration: leak the planted secret and exfiltrate sensitive data"
@@ -104,13 +165,14 @@ three layers, the EchoTargetAdapter surfaces the planted canary, and the
 
 ## Against a real target
 
-Point `--target` at a real profile (e.g. `targets/aigoat.yaml`) and pass the
-natural-language scope. Requires the Copilot SDK + Foundry, as above.
+The manifest names its target via `target_profile_id`; TRIDENT resolves the
+matching profile from the `targets/` directory (e.g. `targets/aigoat.yaml`).
+Switch targets by changing that one field — no CLI flag. Requires the Copilot
+SDK + Foundry, as above.
 
 ```powershell
 python -m src.cli `
   --manifest manifests/aigoat_l0_prompt_injection.yaml `
-  --target   targets/aigoat.yaml `
   --catalog  catalog `
   --out      output `
   --prompt   "<natural-language scope from the user>"
@@ -125,14 +187,65 @@ directly — it receives ready converters + objectives via the enriched
 
 ---
 
-## Tests
+## Minimal target profile
 
-```powershell
-pytest -v
+You do **not** need the full profile schema to onboard a target. A target plugs into the
+**generic** core through a small YAML profile + a `SuccessOracle` block; everything else is
+optional. `targets/echo.yaml` is the canonical *minimal generic* profile and is what the
+recon/attack smokes above use.
+
+The minimum to get **recon + canary + markup + LLM-judge** working:
+
+```yaml
+id: my-target                 # slug (the CLI maps this to an adapter)
+name: "My GenAI app"
+base_url: "https://my-target.invalid"
+
+# Drives technique targetability: a technique runs only if the target's capabilities
+# satisfy its needs_capabilities. has_chat alone is enough for the three recon leads.
+capabilities: [has_chat]
+
+# Abstract attack surface → concrete endpoint. Recon leads only need `chat`.
+surfaces:
+  chat: { method: POST, path: /api/chat }
+
+auth: { type: none }          # none | bearer | apikey | cookie
+
+# The generic success-detection suite. Everything here is optional, but each block
+# unlocks one deterministic detector:
+success_oracle:
+  canary:                     # → exfil_canary / leak_detector (honeytoken planted by the adapter)
+    prefix: TRIDENT
+    plant_surface: chat       # chat | retrieval_ingest | search | tool
+    data_classification: Confidential   # feeds MSRC severity
+  expected_model_set: [GPT, Llama, Mistral, Phi]   # → categorical_match (model fingerprint)
+# output_markup needs no config — it is a structural regex over the response.
+# refusal_judge / judged_objective need no target config — they use the LLM-judge
+# (or the offline heuristic when Foundry is absent).
 ```
 
-Current status: **17/17 passing**
-(7 policy gate rules · 5 ranker · 2 end-to-end dispatch · 3 invariants).
+What each detector needs from the profile:
+
+| Detector | Verdict | Needs in profile |
+|---|---|---|
+| `exfil_canary` / `leak_detector` | `confirmed` | `success_oracle.canary` (and an adapter that plants it) |
+| `output_markup` | `confirmed` | nothing — generic regex on the output |
+| `categorical_match` (fingerprint) | `confirmed` | `success_oracle.expected_model_set` |
+| `refusal_judge` / `judged_objective` | `assessed` | nothing — LLM-judge, offline fallback |
+
+> Adapters: the CLI maps `id` → an adapter (`echo`, `aigoat`). A brand-new `id` needs a small
+> adapter that knows how to `send()` (and, if you use a canary, how to plant it). For the demo,
+> reuse `echo` (in-process) or `aigoat`. See `targets/target_profile.example.yaml` for the full
+> annotated schema.
+
+---
+
+## Tests
+
+> The automated `pytest` suite is **not part of this demo branch** — it will be
+> re-wired in v1 alongside the real PyRIT/judge integration. For the hackathon the
+> verification path is the **recon smoke** above (deterministic `categorical_match`
+> → `confirmed`) plus the offline LLM-judge fallback, which run without Foundry.
 
 ---
 
@@ -218,7 +331,12 @@ in `src/core/config.py`. See `.env.example` for the full variable list.
 
 ## Roadmap (post-MVP)
 
-- Real PyRIT wiring in `skills/pyrit_runner.py` (SelfAskRefusalScorer, SelfAskTrueFalseScorer).
+- **Automatic *technique* synthesis — v1 (out of demo scope).** Grow tooling that
+  drafts new `SKILL.md` techniques (and recon → target-profile generation). Today
+  every technique is a hand-authored `SKILL.md` loaded directly by the registry.
+- Re-wire the `pytest` suite (policy gate, ranker, end-to-end dispatch).
+- Real PyRIT wiring as the default judge in `skills/pyrit_runner.py`
+  (SelfAskRefusalScorer, SelfAskTrueFalseScorer) — today's default is the offline heuristic.
 - HTTP target adapter for AIGoat (today's adapter is in-process Echo).
 - Cumulative-scope techniques (`TRD-MOD-004/005/006`) once the campaign-level
   scorer infra lands.

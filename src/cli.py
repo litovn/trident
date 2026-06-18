@@ -1,26 +1,23 @@
 import argparse
 import asyncio
+import logging
+import yaml
 import json
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 
-import yaml
-
-# Load .env (FOUNDRY_ENDPOINT, FOUNDRY_MODEL_DEPLOYMENT, ...) BEFORE the
-# Coordinator client reads its settings. python-dotenv is optional: when
-# absent the user must export the vars manually.
-try:
-    from dotenv import load_dotenv
-
-    load_dotenv()
-except ImportError:
-    pass
+load_dotenv()
+logging.basicConfig(
+    level=getattr(logging, os.environ.get("TRIDENT_LOG_LEVEL", "INFO").upper(), logging.INFO),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 from .core.client import TridentClient
-from .core.models import Manifest, Scorecard, TargetProfile
+from .core.models import Manifest, TargetProfile
 from .core.trace import Trace
 from .orchestrator.coordinator import Coordinator
-from .reports.correlator import correlate
+from .reports.correlator import correlate, scorecards_from_trace
 from .reports.html_report import render
 from .skills.registry import SkillRegistry
 from .targets.adapter import TargetAdapter
@@ -47,9 +44,46 @@ def _build_target(profile: TargetProfile, canary: str | None) -> TargetAdapter:
     raise ValueError(f"Unknown target profile id: {profile.id!r}")
 
 
+async def _plant_canary(target: TargetAdapter, oracle: SuccessOracle) -> None:
+    """Pre-flight: if the campaign uses a planted canary, write it into the target
+    via the configured ``plant_surface`` so ``exfil_canary`` can fire for real.
+
+    Best-effort and target-agnostic: targets without a ``plant`` capability (or
+    without a ``plant_surface`` in the oracle config) are silently skipped.
+    """
+    if not oracle.canary:
+        return
+    surface = oracle.cfg.get("canary", {}).get("plant_surface")
+    if not surface:
+        return
+    plant = getattr(target, "plant", None)
+    if plant is None:
+        return
+    ok = await plant(surface, oracle.canary)
+    print(f"[pre-flight] canary plant via {surface!r}: {'ok' if ok else 'skipped/failed'}")
+
+
+def _load_target_profile(targets_dir: Path, profile_id: str) -> TargetProfile:
+    """Resolve the TargetProfile named by the manifest's ``target_profile_id``.
+
+    The manifest is the campaign spec: it names its target by id, and TRIDENT
+    resolves the matching profile from ``targets_dir`` (matched on the YAML ``id``
+    field, not the filename).
+    """
+    candidates = sorted(targets_dir.glob("*.yaml"))
+    for path in candidates:
+        if _load_yaml(path).get("id") == profile_id:
+            return TargetProfile.model_validate(_load_yaml(path))
+    available = ", ".join(sorted(filter(None, (_load_yaml(p).get("id") for p in candidates)))) or "(none)"
+    raise SystemExit(
+        f"target profile id {profile_id!r} (from manifest) not found under {targets_dir}/ "
+        f"— available ids: {available}"
+    )
+
+
 async def _run(args: argparse.Namespace) -> None:
     manifest = Manifest.model_validate(_load_yaml(Path(args.manifest)))
-    target_profile = TargetProfile.model_validate(_load_yaml(Path(args.target)))
+    target_profile = _load_target_profile(Path(args.targets_dir), manifest.target_profile_id)
     registry = SkillRegistry().load_dir(Path(args.catalog))
 
     out_dir = Path(args.out)
@@ -63,17 +97,18 @@ async def _run(args: argparse.Namespace) -> None:
     client = TridentClient()
     await client.start()
     try:
+        await _plant_canary(target, oracle)
         coord = Coordinator(client, manifest, target, target_profile, registry, trace,
                             oracle=oracle)
 
         summary = await coord.run_agentic(args.prompt)
 
-        scorecards: list[Scorecard] = []
-        for step in trace.steps():
-            if step.kind == "dispatch" and "scorecard" in step.payload:
-                scorecards.append(Scorecard.model_validate(step.payload["scorecard"]))
-        corr = correlate(scorecards)
-        corr["coordinator_summary"] = summary
+        corr = correlate(
+            scorecards_from_trace(trace),
+            coord.last_plan,
+            registry,
+            summary=summary,
+        )
     finally:
         await client.stop()
         aclose = getattr(target, "aclose", None)
@@ -91,7 +126,9 @@ async def _run(args: argparse.Namespace) -> None:
 def main() -> None:
     p = argparse.ArgumentParser(prog="trident", description="TRIDENT — red-teaming accelerator")
     p.add_argument("--manifest", required=True, help="Path to manifest YAML")
-    p.add_argument("--target", required=True, help="Path to TargetProfile YAML")
+    p.add_argument("--targets-dir", default="targets",
+                   help="Directory of TargetProfile YAMLs (default: targets); the manifest's "
+                        "target_profile_id selects which profile to use")
     p.add_argument("--catalog", default="catalog", help="Catalog directory (default: catalog)")
     p.add_argument("--prompt", required=True, help="NL prompt describing what to test")
     p.add_argument("--out", default="output", help="Output directory (default: output)")

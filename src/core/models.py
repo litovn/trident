@@ -61,7 +61,7 @@ _PHASE_TO_MODES: dict[Phase, set[Mode]] = {
 # Catalog types
 # ──────────────────────────────────────────────────────────────────────────
 class TechniqueConfig(BaseModel):
-    """One catalog entry (schema v0.3). A PyRIT-backed skill, tagged OWASP × MITRE ATLAS."""
+    """One catalog entry (schema v0.3). A PyRIT-backed skill, tagged OWASP x MITRE ATLAS."""
     id: str
     name: str
     desc: str = ""
@@ -189,26 +189,19 @@ class TargetProfile(BaseModel):
 # Manifest (Rules of Engagement as Code — ADR-008)
 #
 # Design intent: the manifest declares *constraints* (safety, budget, hosts),
-# not the *plan*. Layer and technique selection are driven by the NL prompt
-# via the ranker. Optional pin-down fields (layers / allowlist) remain for
-# deterministic smoke tests and CI, but must be empty by default so TRIDENT
-# is free to decide.
+# not the *plan*. Layer and technique selection are driven entirely by the NL
+# prompt via the ranker — there are no layer/technique pin-down fields.
 # ──────────────────────────────────────────────────────────────────────────
 class Manifest(BaseModel):
     campaign_id: str
     mode: Mode = "recon"
     target_profile_id: str
-    # Empty = no layer pin: the ranker chooses layers from the prompt.
-    # If populated, restricts to the listed layers (ADR-021: 1 or all 3).
-    layers: list[Layer] = Field(default_factory=list)
-    # Empty = no allowlist; ranker picks freely. Populate only for pinned smoke tests.
-    technique_allowlist: list[str] = Field(default_factory=list)
-    # Kept for future "block specific techniques" use case (refined later).
+    # Hard "never run these" safety control (constraint, not plan).
     technique_denylist: list[str] = Field(default_factory=list)
     host_allowlist: list[str] = Field(default_factory=list)
     query_budget_per_vertical: int = 100
     hitl_techniques: list[str] = Field(default_factory=list)
-    egress_local_only: bool = True
+
 
 
 # ──────────────────────────────────────────────────────────────────────────

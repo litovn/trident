@@ -7,7 +7,6 @@ from ..targets.oracle import NullOracle, SuccessOracle, resolve_placeholders
 from .converter_factory import apply_converters_async, build_converters
 from .judge_factory import make_judge_target, score_judged_async
 from .pyrit_bootstrap import ensure_pyrit_initialized
-from .scorer_factory import score_deterministic
 
 
 # Data classification → MSRC-style severity bump on confirmed leaks.
@@ -137,10 +136,10 @@ class PyritRunner:
     async def _score(
         self, tech: TechniqueConfig, response_text: str, objective: str | None
     ) -> Verdict:
-        """Route to PyRIT scorers; deterministic via SubString/MarkdownInjection,
-        judged via SelfAsk* (with v0 heuristic fallback when no judge target)."""
+        """Deterministic scorers → SuccessOracle (pure-Python ground truth);
+        judged scorers → PyRIT SelfAsk* (v0 heuristic fallback when no judge)."""
         if tech.scorer in DETERMINISTIC_SCORERS:
-            return await score_deterministic(tech.scorer, response_text, self.oracle)
+            return self.oracle.detect(tech.scorer, response_text)
         return await score_judged_async(
             tech.scorer, response_text,
             objective=objective, judge_target=self._judge_target,

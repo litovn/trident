@@ -1,0 +1,63 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trident"
+version = "0.3.0"
+description = "Black-box, multi-agent AI red-teaming accelerator (GitHub Copilot SDK + Microsoft Foundry + PyRIT)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Nikita Litovchenko" }]
+
+# Base deps: everything the catalog/registry/oracle/CLI need to import and run
+# the Foundry-free deterministic core. Heavier capabilities live in extras.
+dependencies = [
+    "pydantic>=2.10,<3",
+    "PyYAML>=6,<7",
+    "python-dotenv>=1,<2",
+    "httpx>=0.28,<1",          # targets/aigoat HTTP adapter (imported by the CLI)
+]
+
+[project.optional-dependencies]
+# Agentic Coordinator + vertical sessions (Copilot SDK) + Azure-AD auth.
+sdk = [
+    "github-copilot-sdk>=1,<2",
+    "azure-identity>=1.20,<2",
+    "aiohttp>=3.10",           # azure.identity.aio async transport
+]
+# Phase-1 NL→scope ranker (Azure OpenAI embedder + confirmer).
+ranker = [
+    "openai>=2,<3",
+    "azure-identity>=1.20,<2",
+]
+# Real PyRIT execution surface (converters, judged scorers, orchestrators).
+real = [
+    "pyrit>=0.14,<1",
+]
+# Tests + build tooling.
+dev = [
+    "pytest>=8",
+    "build>=1",
+]
+
+[project.scripts]
+trident = "src.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/t-nikital_microsoft/trident"
+
+[tool.setuptools]
+# The code imports the package as `src.*` (e.g. `from src.core.client import ...`)
+# and runs via `python -m src.cli`, so `src` IS the import package.
+packages = [
+    "src",
+    "src.core",
+    "src.nl",
+    "src.orchestrator",
+    "src.agents",
+    "src.skills",
+    "src.targets",
+    "src.reports",
+]

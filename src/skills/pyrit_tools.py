@@ -1,7 +1,8 @@
 """PyRIT primitives exposed as Copilot SDK tools.
 
-Architecture (ADR-revisit, v0.4): catalog techniques are *skills* (SKILL.md,
-see ``skillgen.py``); PyRIT is the *tool* surface the agent composes. Instead
+Architecture (ADR-revisit, v0.4): catalog techniques are *skills* (each authored
+as a ``SKILL.md`` — the single source of truth); PyRIT is the *tool* surface the
+agent composes. Instead
 of one ``@define_tool`` per technique we expose three technique-agnostic
 primitives:
 
@@ -31,7 +32,6 @@ from ..core.models import DETERMINISTIC_SCORERS, Verdict
 from .base import SkillContext, make_skill_handler
 from .judge_factory import score_judged_async
 from .registry import SkillRegistry
-from .scorer_factory import score_deterministic
 
 
 def make_pyrit_tools(registry: SkillRegistry, ctx: SkillContext) -> list:
@@ -98,7 +98,7 @@ def make_pyrit_tools(registry: SkillRegistry, ctx: SkillContext) -> list:
     async def pyrit_run_scorer(params: RunScorerParams) -> dict:
         verdict: Verdict
         if params.scorer in DETERMINISTIC_SCORERS:
-            verdict = await score_deterministic(params.scorer, params.response, ctx.runner.oracle)
+            verdict = ctx.runner.oracle.detect(params.scorer, params.response)
         else:
             verdict = await score_judged_async(
                 params.scorer, params.response,

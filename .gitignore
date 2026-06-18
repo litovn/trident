@@ -11,6 +11,5 @@ output/
 tests/
 docs/
 
-*.toml
-
 context/
+

@@ -1,3 +1,4 @@
+import inspect
 import logging
 from typing import Any, Optional
 
@@ -24,7 +25,9 @@ class TridentClient:
         from copilot.session import PermissionHandler  # type: ignore
 
         self._sdk_perm = PermissionHandler
-        self._token_provider = self._build_token_provider()
+        # A static FOUNDRY_API_KEY needs no Azure-AD credential; only build the
+        # token provider when we'll actually mint a bearer (az login / Managed Identity).
+        self._token_provider = None if self.settings.api_key else self._build_token_provider()
         logger.info(
             "TridentClient: Foundry endpoint=%s deployment=%s (Foundry credit)",
             self.settings.endpoint, self.settings.model_deployment,
@@ -75,16 +78,35 @@ class TridentClient:
             self._credential, "https://services.azure.com/.default"
         )
 
-    def _build_provider_config(self) -> dict:
-        """Azure provider dict consumed by `CopilotClient.create_session`."""
+    def _build_provider_config(self, *, bearer_token: str | None) -> dict:
+        """Azure provider dict consumed by `CopilotClient.create_session`.
+
+        The SDK's provider config accepts a STATIC ``api_key`` or ``bearer_token``
+        — it has no callable token-provider slot — so auth is resolved here at
+        session-creation time: an explicit ``FOUNDRY_API_KEY`` wins, otherwise we
+        pass a freshly-minted Azure-AD bearer (from `az login` / Managed Identity).
+        """
         s = self.settings
-        return {
+        provider: dict[str, Any] = {
             "type": "azure",
             "base_url": f"{s.endpoint}/openai/deployments/{s.model_deployment}",
-            "token_provider": self._token_provider,
             "wire_api": s.wire_api,
             "azure": {"api_version": s.api_version},
         }
+        if s.api_key:
+            provider["api_key"] = s.api_key
+        elif bearer_token:
+            provider["bearer_token"] = bearer_token
+        return provider
+
+    async def _resolve_bearer(self) -> str | None:
+        """Mint an Azure-AD bearer from the token provider (async or sync)."""
+        if self._token_provider is None:
+            return None
+        token = self._token_provider()
+        if inspect.isawaitable(token):
+            token = await token
+        return token
 
     # ---- public API ------------------------------------------------------
 
@@ -102,23 +124,24 @@ class TridentClient:
         by `FOUNDRY_MODEL_DEPLOYMENT`.
 
         ``skill_directories`` lists folders the SDK scans for SKILL.md files.
-        ``enable_skills`` toggles skill matching on (default off — caller wins;
-        empty-mode clients require this to be True for the skills to actually be
-        discoverable at runtime).
+        ``enable_skills`` toggles skill matching on (only consulted when
+        ``skill_directories`` is non-empty; the SDK defaults it off in empty
+        mode, so callers that want skills must pass True).
         """
         if not self.started:
             raise RuntimeError("TridentClient not started — call await client.start() first")
 
+        bearer = None if self.settings.api_key else await self._resolve_bearer()
         kwargs: dict[str, Any] = dict(
             model=self.settings.model_deployment,
             tools=tools,
             streaming=streaming,
             on_permission_request=self._sdk_perm.approve_all,
-            provider=self._build_provider_config(),
+            provider=self._build_provider_config(bearer_token=bearer),
         )
         if skill_directories:
             kwargs["skill_directories"] = skill_directories
-            kwargs["enable_skills"] = enable_skills or True  # any dir → enable
+            kwargs["enable_skills"] = enable_skills
         if agent_prompt:
             kwargs["custom_agents"] = [
                 {
