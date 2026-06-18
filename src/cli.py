@@ -9,10 +9,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from .core.client import TridentClient
-from .core.models import Manifest, Scorecard, TargetProfile
+from .core.models import Manifest, TargetProfile
 from .core.trace import Trace
 from .orchestrator.coordinator import Coordinator
-from .reports.correlator import correlate
+from .reports.correlator import correlate, scorecards_from_trace
 from .reports.html_report import render
 from .skills.registry import SkillRegistry
 from .targets.adapter import TargetAdapter
@@ -98,12 +98,12 @@ async def _run(args: argparse.Namespace) -> None:
 
         summary = await coord.run_agentic(args.prompt)
 
-        scorecards: list[Scorecard] = []
-        for step in trace.steps():
-            if step.kind == "dispatch" and "scorecard" in step.payload:
-                scorecards.append(Scorecard.model_validate(step.payload["scorecard"]))
-        corr = correlate(scorecards)
-        corr["coordinator_summary"] = summary
+        corr = correlate(
+            scorecards_from_trace(trace),
+            coord.last_plan,
+            registry,
+            summary=summary,
+        )
     finally:
         await client.stop()
         aclose = getattr(target, "aclose", None)

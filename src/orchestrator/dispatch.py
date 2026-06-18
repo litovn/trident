@@ -36,6 +36,7 @@ def _collect_scorecard(trace: Trace, vcfg: VerticalConfig) -> Scorecard:
                 oracle_hits += 1
             findings.append({
                 "technique_id": s.technique_id,
+                "success": bool(result.get("success")),
                 "verdict": result.get("verdict"),
                 "severity": result.get("severity"),
                 "response": result.get("response", "")[:200],

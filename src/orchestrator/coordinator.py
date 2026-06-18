@@ -55,6 +55,9 @@ class Coordinator:
         self.oracle = oracle
         self.runner = PyritRunner(oracle=oracle)
         self.ctx = SkillContext(gate=self.gate, runner=self.runner, trace=trace, target=target)
+        # Phase 1-2 plan, stored after intake so the reporter can compute coverage
+        # (planned vs tested vs excluded) without re-running the ranker.
+        self.last_plan: ScanPlan | None = None
 
     # ---- Phases 1–2 (pure functions) ------------------------------------
 
@@ -67,6 +70,7 @@ class Coordinator:
     async def run_agentic(self, nl_prompt: str) -> str:
         """Agentic Phase 3 — Coordinator Session reasons over dispatch tools."""
         plan = self.intake(nl_prompt)
+        self.last_plan = plan
         tools = make_dispatch_tools(self.client, self.registry, self.ctx)
         session = await self.client.new_session(
             role="coordinator",

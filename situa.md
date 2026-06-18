@@ -173,6 +173,19 @@ I findings
 - F-REP-4 — La fuga di layering del cli (la vecchia F3): l'estrazione scorecard + l'iniezione di coordinator_summary vivono in cli.py, non in reports/. Da spostare in un assemblatore (assemble_report(trace, summary)).
 - F-REP-5 — Per le catene serve più delle scorecard. Per costruire C1 servono i dettagli per-finding (tecnica→owasp→atlas→successo+evidenza), che stanno nella trace (le findings già portano technique_id/verdict/severity). Quindi C1 = il correlator legge i dati per-finding e li sequenzia per ordine di tattica ATLAS.
 
+Cosa ho costruito
+correlator.py — da stub a logica reale:
+
+- scorecards_from_trace(trace) — estrae le scorecard dai dispatch step (la Trace immutabile resta l'unica fonte del report, invariante #3).
+- _enrich_successes() — annota ogni finding riuscito con OWASP / ATLAS / severità / controlli Microsoft, leggendo dal registry (SKILL.md = source of truth).
+- _build_chains() — catena cross-layer = successi che attraversano ≥2 layer, sequenziati per tattica ATLAS, blast_radius = severità peggiore. Etichetta onesta: "correlated post-hoc (not autonomously executed)".
+- _coverage() — copertura onesta: planned / tested / not_tested_in_scope / excluded_pre_scan (con motivi) / coverage_pct.
+- _remediation() — controlli Microsoft contati per numero di finding indirizzati.
+
+html_report.py — da <pre> JSON a template presentabile: KPI header, sezione catene (con disclaimer post-hoc + badge blast_radius), tabella findings (severità colorate), copertura (tested vs escluso-con-motivi), remediation, JSON grezzo in <details>. Tutto con html.escape (nessun XSS).
+
+Wiring: dispatch.py ora porta success nel finding; coordinator.py espone self.last_plan; cli.py chiama la nuova firma correlate(scorecards_from_trace(trace), coord.last_plan, registry, summary=...).
+
 # 9. render(corr, html)                              [reports/html_report.py]
 
 
