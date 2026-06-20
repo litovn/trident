@@ -141,6 +141,13 @@ async def _run(args: argparse.Namespace) -> None:
 
     chosen_package = _resolve_package(args, registry, manifest)
 
+    # HITL per-layer confirmation is interactive — enable only on a real TTY so
+    # non-interactive runs never hang waiting for input.
+    confirm_chain = bool(args.confirm_chain) and sys.stdin.isatty()
+    if args.confirm_chain and not confirm_chain:
+        logging.getLogger("trident").warning(
+            "--confirm-chain ignored: stdin is not an interactive terminal")
+
     out_dir = Path(args.out)
     trace_path = out_dir / f"{manifest.campaign_id}.trace.jsonl"
     trace = Trace(jsonl_path=trace_path)
@@ -154,7 +161,8 @@ async def _run(args: argparse.Namespace) -> None:
     try:
         await _plant_canary(target, oracle)
         coord = Coordinator(client, manifest, target, target_profile, registry, trace,
-                            oracle=oracle, chosen_package=chosen_package)
+                            oracle=oracle, chosen_package=chosen_package,
+                            confirm_chain=confirm_chain)
 
         summary = await coord.run_agentic(args.prompt)
 
@@ -188,6 +196,8 @@ def main() -> None:
     p.add_argument("--prompt", required=True, help="NL prompt describing what to test")
     p.add_argument("--package", default="",
                    help="Skip the advisor and use this attack package id (e.g. PKG-EXFIL)")
+    p.add_argument("--confirm-chain", action="store_true",
+                   help="HITL: ask before dispatching each layer (attack-chain step); interactive TTY only")
     p.add_argument("--out", default="output", help="Output directory (default: output)")
     asyncio.run(_run(p.parse_args()))
 

@@ -1,0 +1,10 @@
+# Recon-mode smoke — recon-phase techniques only (the gate blocks exploit-only).
+# Scope is the chosen attack package (advisor, or --package; default in recon mode
+# is PKG-RECON → the three lead recon techniques). Runs against the in-process echo target.
+campaign_id: smoke-001-recon
+mode: recon
+target_profile_id: echo
+technique_denylist: []
+host_allowlist: [memory://echo, 127.0.0.1]
+query_budget_per_vertical: 20
+hitl_techniques: []

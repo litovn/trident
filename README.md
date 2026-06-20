@@ -9,7 +9,8 @@ Built on GitHub Copilot SDK + Microsoft Foundry + (eventually) PyRIT.
 > Scope selection is Foundry-backed; without Foundry it falls back to a deterministic
 > default package per campaign mode.
 
-See `TRIDENT_design_context.md` for the full design rationale and ADRs.
+See `WORKLOG.md` (fix log + known doc/impl gaps), `situa.md` (design diary), and the
+`catalog/*.md` reference docs for the design rationale and ADR references.
 
 ---
 

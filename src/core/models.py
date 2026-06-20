@@ -190,8 +190,9 @@ class TargetProfile(BaseModel):
 # Manifest (Rules of Engagement as Code — ADR-008)
 #
 # Design intent: the manifest declares *constraints* (safety, budget, hosts),
-# not the *plan*. Layer and technique selection are driven entirely by the NL
-# prompt via the ranker — there are no layer/technique pin-down fields.
+# not the *plan*. Layer and technique selection are driven by the chosen attack
+# package (conversational advisor, or --package) — there are no layer/technique
+# pin-down fields.
 # ──────────────────────────────────────────────────────────────────────────
 class Manifest(BaseModel):
     campaign_id: str

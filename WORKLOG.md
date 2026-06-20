@@ -5,6 +5,88 @@ Newest entry first. Update as work continues.
 
 ---
 
+## Doc vs implementation — known gaps (audit 2026-06-20)
+
+Honest map of where the docs describe more than the code currently delivers. The
+**core path is real and validated** (advisor → gated scope → fenced vertical
+dispatch → PyRIT execution → oracle/judge scoring → correlated report). The gaps
+below are places where prose reads present-tense for things that are skeleton or
+roadmap.
+
+| Doc claim | Reality | Where |
+|---|---|---|
+| Recon builds an enriched `TargetProfile` (minimal profile → RECON → profile → HITL → ATTACK) | **Not implemented.** Recon techniques run and write to the trace, but nothing reassembles their output into a `TargetProfile`. | README "Minimal target profile", `oracle.md`; gap noted in `situa.md` (G1) |
+| "Tests attacks continuously" / multi-step attack chains | **Single bounded pass.** Chains are **correlated post-hoc**, not autonomously executed (verified via the dispatch-loop investigation). Per-layer iteration is LLM-driven inside one vertical; no adaptive recon→attack escalation. | README headline; the `correlator` chain label is honest |
+| MSRC severity = impact × ease × data-classification + special rules (system-prompt = enabler; chain carries severity) | **Simplified.** Code does `severity_base` + a data-classification bump on success only. No ease-of-exploitation, no L0/L1/L2, no chain-inherits-severity. | `catalog/severity.md` ≫ `pyrit_runner._score` / `correlator` |
+| "Scoring uses the official PyRIT Scorer subsystem" | **Judged scorers only.** Deterministic scorers (canary/leak/markup/fingerprint) use TRIDENT's pure-Python `SuccessOracle`, not PyRIT scorers — a deliberate divergence from ADR-001. | `scorers.md` states it correctly; the `CATALOG.md` honesty-note overstates it |
+| Invariant #2 "every action passes `PolicyGate.check`" | **Bypassed on the multi-turn path.** `pyrit_run_orchestrator` (Crescendo) drives the target via `TridentPromptTarget`, not the gated handler; the enclosing technique is gated once, not per turn. | `pyrit_tools.py` docstring admits it |
+| pytest suite | **Not wired** on this branch. Verification is the live smoke runs. | README "Tests" |
+
+### Broken / stale references — fixed 2026-06-20
+- **`manifests/sample.yaml`** (recon smoke) was missing — **created** (`campaign_id:
+  smoke-001-recon`, recon mode, echo target), restoring the README recon command
+  (and it aligns with `default_package(recon)` = `PKG-RECON`).
+- README pointer to non-existent **`TRIDENT_design_context.md`** → repointed to
+  `WORKLOG.md` / `situa.md` / the `catalog/*.md` reference docs.
+- `Manifest` docstring in `src/core/models.py` → scope is now "driven by the chosen
+  attack package (advisor / `--package`)", not the removed ranker.
+
+### Note
+The README is not dishonest — its "Demo scope (hackathon)" and "Roadmap" sections
+flag much of this as future; the drift is mostly present-tense prose in the body.
+`situa.md` is the candid design diary that already catalogs several of these.
+
+---
+
+## 2026-06-20 — Per-layer HITL (human-in-the-loop attack-chain gate)
+
+### Why
+Colleague's second ask: TRIDENT should pause before each new attack and ask the
+operator to continue the chain (YES/NO). First we checked whether a loop even
+exists; it does, per-layer.
+
+### Loop investigation (what we found)
+- **Within a vertical:** the LLM agent iterates over the layer's technique ids
+  (one `pyrit_send_prompt` per technique), bounded by `query_budget_per_vertical`.
+  We don't loop — the agent does, inside `send_and_wait`.
+- **Across layers:** dispatch is **sequential in practice** — the Coordinator LLM
+  calls one `dispatch_*` tool, awaits it, then the next (verified by `PKG-OWASP`
+  timestamps: prompt finishes before application starts, etc.). The parallel
+  `asyncio.gather` floor only fires for layers the LLM skipped.
+- **No adaptive/continuous re-scoping;** cross-layer chains are correlated post-hoc.
+
+### The feature
+- New flag **`--confirm-chain`** (opt-in; interactive TTY only — ignored, with a
+  warning, otherwise, so non-interactive runs never hang).
+- Gate lives at the **single choke point** `run_layer`, so it covers **both** the
+  agentic dispatch tools and the deterministic floor. Before dispatching a layer
+  it prints the step + technique ids and asks `Continue the attack chain? [Y/n]`
+  (via `asyncio.to_thread(input, …)` so the event loop isn't blocked).
+- **Decline** marks the layer handled (floor won't re-ask), writes a
+  `declined_by_user` trace step, and skips it **without dispatch**.
+- The floor runs **sequentially** when HITL is on so prompts don't interleave.
+- Files: `src/cli.py` (flag + TTY guard), `src/orchestrator/coordinator.py`
+  (param + sequential floor), `src/orchestrator/dispatch.py` (prompt + gate),
+  `src/skills/base.py` (`confirm_chain` on `SkillContext`).
+
+### Evidence (live, `PKG-OWASP` against AIGoat)
+- Prompt layer → answered **Y** → dispatched (`TRD-PRM-002` `PWNED` success).
+- Application → **n** → `declined by operator`, not dispatched.
+- Model → **n** → `declined by operator`, not dispatched.
+- Report: `layers_executed: ["prompt"]`; coverage honest — declined techniques land
+  in `not_tested_in_scope` (`TRD-APP-001/002/003`, `TRD-MOD-003`), `coverage_pct
+  0.333`; capability-gated `TRD-APP-004` stays in `excluded_pre_scan`. The prompt
+  blocked waiting for input (no busy-loop).
+
+### Open
+- Coverage doesn't yet distinguish "declined by operator" from other not-tested
+  reasons (the `declined_by_user` trace step exists for audit; could be surfaced
+  in the report).
+
+Commit suggestion: `feat(hitl): --confirm-chain — per-layer attack-chain Y/N gate`
+
+---
+
 ## 2026-06-20 — Content filter, judge scoring, and canary plant
 
 ### TL;DR

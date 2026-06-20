@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 
@@ -11,6 +12,15 @@ log = logging.getLogger(__name__)
 
 # Per-vertical Copilot SDK session timeout (see coordinator.py for rationale).
 _VERTICAL_TIMEOUT = float(os.environ.get("TRIDENT_VERTICAL_TIMEOUT", "1200"))
+
+
+def _confirm_layer(layer: str, technique_ids: list[str]) -> bool:
+    """Blocking HITL prompt before dispatching a layer (one attack-chain step).
+    Enter / y / yes -> continue; n / no -> skip. Called via ``asyncio.to_thread``
+    so it does not block the event loop while waiting for the operator."""
+    print(f"\n[HITL] Next attack-chain step -> layer '{layer}': "
+          f"{len(technique_ids)} technique(s) ({', '.join(technique_ids)}).")
+    return input("    Continue the attack chain? [Y/n]: ").strip().lower() in ("", "y", "yes")
 
 
 def _response_text(response) -> str:
@@ -93,6 +103,15 @@ async def run_layer(
                 "reason": f"layer not in gated plan (in scope: {in_scope})"}
     if layer in ctx.dispatched_layers:  # R3: idempotency (only COMPLETED layers)
         return {"status": "skipped", "layer": layer, "reason": "already dispatched"}
+    # HITL: ask the operator before each new attack-chain step. A decline marks
+    # the layer handled (so the floor won't re-ask) and skips it without dispatch.
+    if ctx.confirm_chain and not await asyncio.to_thread(_confirm_layer, layer, vcfg.technique_ids):
+        ctx.dispatched_layers.add(layer)
+        ctx.trace.append_dispatch(layer, {"event": "declined_by_user",
+                                          "techniques": vcfg.technique_ids})
+        log.info("dispatch layer=%s declined by operator", layer)
+        return {"status": "declined", "layer": layer,
+                "reason": "operator declined to continue the attack chain"}
     # Claim the layer up-front so a concurrent re-dispatch is rejected (the
     # check+add is atomic — no await between them). The claim is RELEASED on
     # failure below so a transient error doesn't permanently drop the layer

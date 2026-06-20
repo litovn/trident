@@ -51,6 +51,7 @@ class Coordinator:
         trace: Trace,
         oracle: SuccessOracle | None = None,
         chosen_package: Package | None = None,
+        confirm_chain: bool = False,
     ) -> None:
         self.client = client
         self.manifest = manifest
@@ -68,7 +69,8 @@ class Coordinator:
                       if target_profile.success_oracle else NullOracle())
         self.oracle = oracle
         self.runner = PyritRunner(oracle=oracle)
-        self.ctx = SkillContext(gate=self.gate, runner=self.runner, trace=trace, target=target)
+        self.ctx = SkillContext(gate=self.gate, runner=self.runner, trace=trace, target=target,
+                                confirm_chain=confirm_chain)
         # Phase 1-2 plan, stored after intake so the reporter can compute coverage
         # (planned vs tested vs excluded) without re-running scope selection.
         self.last_plan: ScanPlan | None = None
@@ -131,6 +133,11 @@ class Coordinator:
         if not missed:
             return
         log.info("floor: dispatching missed verticals %s", missed)
-        await asyncio.gather(*(
-            run_layer(self.client, self.registry, self.ctx, layer) for layer in missed
-        ))
+        if self.ctx.confirm_chain:
+            # Sequential so the per-layer HITL prompts don't interleave.
+            for layer in missed:
+                await run_layer(self.client, self.registry, self.ctx, layer)
+        else:
+            await asyncio.gather(*(
+                run_layer(self.client, self.registry, self.ctx, layer) for layer in missed
+            ))
