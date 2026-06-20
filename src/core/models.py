@@ -81,6 +81,7 @@ class TechniqueConfig(BaseModel):
     converters_alt: list[str] = Field(default_factory=list)
     scorer: str = "judged_objective"
     objectives: list[str] = Field(default_factory=list)
+    success_criterion: str = ""   # benign, observable success test for the judge (decoupled from the attack objective)
     severity_base: Severity = "medium"
     severity_track: SeverityTrack = "security"
     controls: list[str] = Field(default_factory=list)

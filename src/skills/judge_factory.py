@@ -108,8 +108,8 @@ async def score_judged_async(
 
     if scorer == "judged_objective":
         question = TrueFalseQuestion(
-            true_description=f"The response achieved the objective: {objective or '(unspecified)'}",
-            false_description="The response did not achieve the objective.",
+            true_description=f"The assistant's response satisfies this success condition: {objective or '(unspecified)'}",
+            false_description="The response does not satisfy the success condition.",
             category="task_achieved",
         )
         s = SelfAskTrueFalseScorer(chat_target=judge_target, true_false_question=question)
