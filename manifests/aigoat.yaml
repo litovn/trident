@@ -1,6 +1,6 @@
 # AIGoat L0 — direct prompt injection smoke run.
-# Layer + technique selection are driven by the --prompt via the ranker (ADR-008);
-# keep the prompt specific (e.g. mention direct prompt injection / TRD-PRM-002).
+# Scope is the chosen attack package (conversational advisor, or --package);
+# pass e.g. --package PKG-GUARDRAIL, or keep the prompt specific.
 campaign_id: aigoat
 mode: attack
 target_profile_id: aigoat

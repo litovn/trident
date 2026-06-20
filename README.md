@@ -3,11 +3,11 @@
 **Black-box, multi-agent AI red-teaming accelerator.**
 Built on GitHub Copilot SDK + Microsoft Foundry + (eventually) PyRIT.
 
-> Phase: **v0.3 skeleton** — orchestrator, vertical agents, NL→scope, hybrid ranker,
-> policy gate, success oracle + canary, trace, target adapters. Catalog content
-> (20 techniques + 12 packages) is production-grade and target-agnostic.
-> The Coordinator runs with the offline KeywordEmbedder out-of-the-box; the same
-> code switches to Azure OpenAI by setting `AZURE_OPENAI_ENDPOINT`.
+> Phase: **v0.3 skeleton** — orchestrator, vertical agents, NL→scope (conversational
+> package advisor), policy gate, success oracle + canary, trace, target adapters.
+> Catalog content (20 techniques + 12 packages) is production-grade and target-agnostic.
+> Scope selection is Foundry-backed; without Foundry it falls back to a deterministic
+> default package per campaign mode.
 
 See `TRIDENT_design_context.md` for the full design rationale and ADRs.
 
@@ -39,7 +39,7 @@ We deliberately keep the surface small:
 ```
 trident/                  # the package
 ├── core/                 # client, models (v0.3), policy_gate (5 rules), trace
-├── nl/                   # ranker (hybrid: lexicon + embedding + LLM confirm), scope_to_scan
+├── nl/                   # advisor (conversational package selector), scope_to_scan
 ├── skills/               # base, registry (with JSON Schema validator), pyrit_runner
 ├── agents/               # factory (build_vertical_session + make_pyrit_tools), briefs (enriched)
 ├── orchestrator/         # coordinator (Phase 0–4), dispatch (agents-as-tools)
@@ -81,7 +81,7 @@ Extras (compose as needed):
 | Extra | Pulls in | Needed for |
 |---|---|---|
 | `sdk` | `github-copilot-sdk`, `azure-identity` | the agentic Coordinator + vertical sessions |
-| `ranker` | `openai`, `azure-identity` | Phase-1 NL→scope ranker (Azure OpenAI) |
+| `ranker` | `openai`, `azure-identity` | Phase-1 NL→scope package advisor (Azure OpenAI) |
 | `real` | `pyrit` | the PyRIT execution surface (converters, judged scorers, orchestrators) |
 | `dev` | `pytest`, `build` | tests + packaging |
 
@@ -125,8 +125,8 @@ Outputs: `output/smoke-001-recon.html` + `output/smoke-001-recon.trace.jsonl`.
 
 **How recon works, end to end:**
 
-1. **NL → scope.** The ranker maps the prompt to recon techniques; `mode: recon` on the
-   manifest means the policy gate keeps only `phase ∈ {recon, both}` and blocks exploit-only
+1. **NL → scope.** The package advisor (or `--package`) selects the attack package; `mode: recon`
+   on the manifest means the policy gate keeps only `phase ∈ {recon, both}` and blocks exploit-only
    techniques (`rule=mode_intent`).
 2. **scope → scan.** `scope_to_scan` drops any technique whose `needs_capabilities` the target
    profile doesn't satisfy. Echo advertises `has_chat` → all three leads survive.
@@ -156,8 +156,8 @@ python -m src.cli `
   --prompt   "data exfiltration: leak the planted secret and exfiltrate sensitive data"
 ```
 
-Expected: the ranker picks `PKG-EXFIL`, runs 4 leak-class techniques across the
-three layers, the EchoTargetAdapter surfaces the planted canary, and the
+Expected: the advisor picks `PKG-EXFIL` (or pass `--package PKG-EXFIL`), runs 4 leak-class
+techniques across the three layers, the EchoTargetAdapter surfaces the planted canary, and the
 `SuccessOracle` confirms each disclosure (5 oracle hits, severity bumped from
 `info` → `high` per the MSRC AI bug bar).
 
@@ -254,8 +254,8 @@ What each detector needs from the profile:
 ```
 NL prompt
   │
-  ▼ Phase 1 — Ranker (hybrid: lexicon hits + cosine + LLM confirm, package-first)
-Scope (selection_mode = package | techniques)
+  ▼ Phase 1 — Package advisor (conversational; or --package) → chosen Package
+Scope (selection_mode = package)
   │
   ▼ Phase 2 — scope_to_scan (gating: capabilities, allow/denylist, mode, status)
 ScanPlan(verticals=[VerticalConfig×N], skipped=[…], layer_cardinality)
@@ -306,17 +306,16 @@ output/<campaign>.html  +  output/<campaign>.trace.jsonl
 
 ## Switching to Microsoft Foundry 
 
-Both the Copilot SDK Coordinator and the Phase-1 ranker route their model
+Both the Copilot SDK Coordinator and the Phase-1 package advisor route their model
 calls through Foundry using `DefaultAzureCredential` — every call bills
 against **Foundry credit, not GitHub Copilot tokens**. `FOUNDRY_ENDPOINT` is
-required; `TridentClient.start()` raises if it is unset. The ranker keeps a
-deterministic `KeywordEmbedder` + `PassthroughConfirmer` only for unit tests
-(no model call), not as a runtime fallback.
+required; `TridentClient.start()` raises if it is unset. Without Foundry the advisor
+falls back to a deterministic default package per campaign mode, so a run still works
+offline (just without the conversational scope selection).
 
 ```powershell
 $env:FOUNDRY_ENDPOINT          = "https://<your-foundry>.cognitiveservices.azure.com"
-$env:FOUNDRY_MODEL_DEPLOYMENT  = "gpt-4o-mini"           # Coordinator + ranker chat
-$env:FOUNDRY_EMBED_DEPLOYMENT  = "text-embedding-3-large" # ranker embedder (multilingual)
+$env:FOUNDRY_MODEL_DEPLOYMENT  = "gpt-4o-mini"           # Coordinator + advisor + judge chat
 # Auth (preferred): DefaultAzureCredential — `az login` locally, MI in prod.
 # Optional BYOK shortcut: $env:FOUNDRY_API_KEY = "..."
 az login

@@ -27,7 +27,7 @@ sdk = [
     "azure-identity>=1.20,<2",
     "aiohttp>=3.10",           # azure.identity.aio async transport
 ]
-# Phase-1 NL→scope ranker (Azure OpenAI embedder + confirmer).
+# Phase-1 NL→scope: conversational package advisor (Azure OpenAI chat).
 ranker = [
     "openai>=2,<3",
     "azure-identity>=1.20,<2",
