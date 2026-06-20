@@ -82,12 +82,15 @@ class AIGoatTargetAdapter:
             return False
         token = await self._ensure_token()
         field = surf.get("body_field", "content")
+        # AIGoat's /api/knowledge-base requires BOTH title and content (FastAPI 422s
+        # otherwise). The honeytoken goes in the retrievable content; the title is a
+        # benign label that doubles as a retrieval hook for the later exfil attempt.
         try:
             resp = await self._client.request(
                 surf.get("method", "POST").upper(),
                 surf["path"],
                 headers={"Authorization": f"Bearer {token}"},
-                json={field: content},
+                json={"title": "Confidential internal note", field: content},
             )
             resp.raise_for_status()
             return True
