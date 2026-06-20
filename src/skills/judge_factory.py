@@ -97,7 +97,7 @@ async def score_judged_async(
 
     if scorer == "refusal_judge":
         s = SelfAskRefusalScorer(chat_target=judge_target)
-        scores = await s.score_text_async(text=response_text)
+        scores = await s.score_text_async(text=response_text, objective=objective)
         sc = scores[0] if scores else None
         refused = bool(sc) and _truthy(sc)
         return Verdict(
@@ -113,7 +113,7 @@ async def score_judged_async(
             category="task_achieved",
         )
         s = SelfAskTrueFalseScorer(chat_target=judge_target, true_false_question=question)
-        scores = await s.score_text_async(text=response_text)
+        scores = await s.score_text_async(text=response_text, objective=objective)
         sc = scores[0] if scores else None
         achieved = bool(sc) and _truthy(sc)
         return Verdict(

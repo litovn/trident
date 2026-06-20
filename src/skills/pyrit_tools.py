@@ -52,16 +52,16 @@ def make_pyrit_tools(registry: SkillRegistry, ctx: SkillContext) -> list:
     # ---- pyrit_send_prompt ------------------------------------------------
 
     class SendPromptParams(BaseModel):
-        technique_id: str = Field(description="Catalog technique id this send belongs to (e.g. TRD-PRM-001)")
-        prompt: str = Field("", description="Attack prompt. Empty → the technique's first objective is used.")
+        technique_id: str = Field(description="Catalog technique id to run (e.g. TRD-PRM-001)")
         endpoint: str = Field("", description="Optional target endpoint (must satisfy host_allowlist).")
 
     @define_tool(
         name="pyrit_send_prompt",
         description=(
-            "Send a single prompt to the target via PyRIT. The converters declared by "
-            "the technique in the catalog are applied automatically; per-call overrides "
-            "are not supported in v0. Records a gate decision and an execution result "
+            "Run a catalog technique against the target via PyRIT. You pass ONLY the "
+            "technique_id — you do NOT author the prompt. The technique's catalog "
+            "objective is resolved and weaponized by its declared PyRIT converters / "
+            "strategy internally. Records a gate decision and an execution result "
             "attributed to technique_id. Returns the target response plus the scorer "
             "verdict for the technique."
         ),
@@ -71,10 +71,7 @@ def make_pyrit_tools(registry: SkillRegistry, ctx: SkillContext) -> list:
         if tech is None:
             return {"status": "error", "reason": f"unknown technique_id: {params.technique_id}"}
         handler = make_skill_handler(tech, ctx)
-        return await handler({
-            "prompt": params.prompt,
-            "endpoint": params.endpoint,
-        })
+        return await handler({"endpoint": params.endpoint})
 
     # ---- pyrit_run_scorer -------------------------------------------------
 
