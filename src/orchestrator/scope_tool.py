@@ -1,10 +1,10 @@
 """The coordinator's `select_scope` tool — the agentic "analyze" surface over the
-deterministic ranker + gate floor (D-RANK b).
+deterministic package-projection + gate floor (D-RANK b).
 
 The Coordinator LLM calls `select_scope` once to turn the campaign's NL prompt
-into a policy-GATED ScanPlan. The tool body runs the hybrid ranker (`rank`) then
-the deterministic gate/config projection (`scope_to_scan`); the latter is bundled
-INSIDE the tool so it always runs and is never separately skippable — the
+into a policy-GATED ScanPlan. The tool body projects the operator-chosen attack
+package then runs the deterministic gate/config projection (`scope_to_scan`); the
+gate is bundled INSIDE the tool so it always runs and is never separately skippable — the
 coordinator never sees an un-gated scope. The gated plan is stashed in the
 SkillContext so the dispatch tools can pull each layer's VerticalConfig without
 round-tripping JSON through the LLM (G-CO-1), and a coverage-friendly summary
@@ -15,9 +15,8 @@ NOTE: like ``skills/pyrit_tools.py`` this module must NOT use
 ``typing.get_type_hints`` on the decorated function and cannot resolve a locally
 defined Pydantic params class if its annotations are stored as strings.
 """
-from ..core.models import Manifest, ScanPlan, TargetProfile
-from ..nl.ranker import rank
-from ..nl.scope_to_scan import scope_to_scan
+from ..core.models import Manifest, Package, ScanPlan, TargetProfile
+from ..nl.scope_to_scan import default_package, scope_from_package, scope_to_scan
 from ..skills.base import SkillContext
 from ..skills.registry import SkillRegistry
 
@@ -27,18 +26,24 @@ _TOOL_SUFFIX = {"prompt": "prompt", "application": "app", "model": "model"}
 
 
 def select_scope_plan(
-    prompt: str,
     manifest: Manifest,
     target_profile: TargetProfile,
     registry: SkillRegistry,
     ctx: SkillContext,
+    *,
+    chosen_package: Package | None = None,
 ) -> ScanPlan:
-    """Deterministic seam: rank + gate → gated ScanPlan, stashed in ``ctx``.
+    """Deterministic seam: project the chosen package → gate → gated ScanPlan,
+    stashed in ``ctx``.
 
-    Shared by the `select_scope` SDK tool and the coordinator's deterministic
-    floor (fallback), so both produce an identical, reproducible plan.
+    The package is selected upstream (operator + conversational advisor in the
+    CLI, or an explicit ``--package``); here we only project it and run the
+    deterministic gate. When no package was chosen (non-interactive / no Foundry),
+    fall back to a sensible ``default_package`` so the floor stays reproducible.
+    Shared by the `select_scope` SDK tool and the coordinator's deterministic floor.
     """
-    scope = rank(prompt, registry)
+    pkg = chosen_package or default_package(manifest.mode, registry)
+    scope = scope_from_package(pkg, registry)
     plan = scope_to_scan(scope, manifest, target_profile, registry)
     ctx.scan_plan = plan
     return plan
@@ -68,12 +73,13 @@ def make_select_scope_tool(
     target_profile: TargetProfile,
     registry: SkillRegistry,
     ctx: SkillContext,
-    prompt: str,
+    *,
+    chosen_package: Package | None = None,
 ):
-    """Build the `select_scope` SDK tool with the campaign prompt bound at build
-    time: the LLM decides WHEN to scope, not WHAT prompt to analyze. This keeps
-    the ranker's lexicon lane deterministic on the operator's exact words (so a
-    typed "LLM07" still hits) and removes a rewording variance point."""
+    """Build the `select_scope` SDK tool. The attack package is chosen upstream
+    (operator + advisor, or ``--package``) and bound here at build time, so the
+    LLM decides WHEN to project/gate it, not WHAT to select — the gate stays
+    deterministic and the coordinator never sees an un-gated scope."""
     from copilot.tools import define_tool  # type: ignore  (lazy: keep import SDK-free)
     from pydantic import BaseModel
 
@@ -83,13 +89,14 @@ def make_select_scope_tool(
     @define_tool(
         name="select_scope",
         description=(
-            "Analyze the campaign request and return the policy-gated red-team plan: "
+            "Return the policy-gated red-team plan for the chosen attack package: "
             "the in-scope layers/techniques (each with the dispatch tool to call) and "
             "what was skipped and why. Call this FIRST, before any dispatch."
         ),
     )
     async def select_scope(params: SelectScopeParams) -> dict:
-        plan = select_scope_plan(prompt, manifest, target_profile, registry, ctx)
+        plan = select_scope_plan(manifest, target_profile, registry, ctx,
+                                 chosen_package=chosen_package)
         return plan_summary(plan)
 
     return select_scope
