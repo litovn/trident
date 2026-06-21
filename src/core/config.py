@@ -20,6 +20,15 @@ class FoundrySettings:
     embed_deployment: str = "text-embedding-3-large"
     chat_deployment: str = ""      # empty → falls back to model_deployment
 
+    # ── Foundry Agent Service project (web_search grounding tool) ───────
+    # The web_search tool runs server-side in the Foundry Responses API, which
+    # is exposed on the *project* endpoint, e.g.
+    #   https://<resource>.ai.azure.com/api/projects/<project>
+    # This is distinct from `endpoint` (the bare account / model URL the
+    # Copilot SDK + ranker use). Optional: the web_search tool degrades to an
+    # "unavailable" no-op when this is unset, leaving every other flow untouched.
+    project_endpoint: str = ""
+
     @classmethod
     def from_env(cls) -> "FoundrySettings":
         return cls(
@@ -30,6 +39,7 @@ class FoundrySettings:
             wire_api=_env("FOUNDRY_WIRE_API", "chat_completions"),
             embed_deployment=_env("FOUNDRY_EMBED_DEPLOYMENT", "text-embedding-3-large"),
             chat_deployment=_env("FOUNDRY_CHAT_DEPLOYMENT"),
+            project_endpoint=_env("FOUNDRY_PROJECT_ENDPOINT"),
         )
 
     def require_endpoint(self) -> None:
@@ -44,6 +54,21 @@ class FoundrySettings:
     def effective_chat_deployment(self) -> str:
         """Chat deployment for the ranker: explicit override or the agent's model."""
         return self.chat_deployment or self.model_deployment
+
+    @property
+    def responses_url(self) -> str:
+        """Foundry Responses API URL used by the web_search grounding tool.
+
+        Derived from `project_endpoint`; empty when it is unset (the tool then
+        reports itself unavailable rather than calling out). Idempotent whether
+        the project endpoint is bare or already suffixed with ``/openai/v1``.
+        """
+        ep = self.project_endpoint.strip().rstrip("/")
+        if not ep:
+            return ""
+        if ep.endswith("/openai/v1"):
+            return f"{ep}/responses"
+        return f"{ep}/openai/v1/responses"
 
 
 @lru_cache(maxsize=1)
