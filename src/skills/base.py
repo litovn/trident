@@ -29,6 +29,10 @@ class SkillContext:
     # Layers already dispatched this campaign — the idempotency floor (R3): the
     # dispatch tools refuse to re-run a layer (no double budget / double trace).
     dispatched_layers: set[str] = field(default_factory=set)
+    # HITL: when True, run_layer asks the operator to confirm each layer (one
+    # attack-chain step) before dispatching it. Set by the CLI only on an
+    # interactive TTY, so non-interactive runs never block.
+    confirm_chain: bool = False
 
 
 def make_skill_handler(tech: TechniqueConfig, ctx: SkillContext) -> SkillHandler:

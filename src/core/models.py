@@ -81,6 +81,7 @@ class TechniqueConfig(BaseModel):
     converters_alt: list[str] = Field(default_factory=list)
     scorer: str = "judged_objective"
     objectives: list[str] = Field(default_factory=list)
+    success_criterion: str = ""   # benign, observable success test for the judge (decoupled from the attack objective)
     severity_base: Severity = "medium"
     severity_track: SeverityTrack = "security"
     controls: list[str] = Field(default_factory=list)
@@ -108,26 +109,12 @@ class TechniqueConfig(BaseModel):
     def runs_in(self, mode: Mode) -> bool:
         return mode in _PHASE_TO_MODES[self.phase]
 
-    # ---- Ranker hooks --------------------------------------------------
-
-    def embedding_text(self) -> str:
-        """Indexed text for the semantic lane. Excludes raw taxonomy IDs (noise)
-        but includes the human OWASP name + intent_examples."""
-        parts = [self.name, self.desc, self.owasp_name, *self.intent_examples]
-        return " | ".join(p for p in parts if p)
-
-    def alias_terms(self) -> list[str]:
-        """Lexicon-lane terms: aliases + OWASP id (typed shortcut)."""
-        terms = [str(a).lower() for a in self.aliases]
-        if self.owasp_id and self.owasp_id != "N/A":
-            terms.append(self.owasp_id.lower())
-        return terms
-
 
 class Package(BaseModel):
     """Curated bundle of techniques + safe limits + which modes it can run in."""
     id: str
     name: str
+    description: str = ""
     axis: Axis = "profile"
     aliases: list[str] = Field(default_factory=list)
     intent_examples: list[str] = Field(default_factory=list)
@@ -149,11 +136,6 @@ class Package(BaseModel):
     def max_intensity(self) -> Optional[str]:
         return self.limits.get("max_intensity")
 
-    def embedding_text(self) -> str:
-        return " | ".join(p for p in [self.name, *self.intent_examples] if p)
-
-    def alias_terms(self) -> list[str]:
-        return [str(a).lower() for a in self.aliases]
 
 class PackageCandidate(BaseModel):
     """One ranked package proposal: ranker → (HITL selection) → scope_to_scan.
@@ -208,8 +190,9 @@ class TargetProfile(BaseModel):
 # Manifest (Rules of Engagement as Code — ADR-008)
 #
 # Design intent: the manifest declares *constraints* (safety, budget, hosts),
-# not the *plan*. Layer and technique selection are driven entirely by the NL
-# prompt via the ranker — there are no layer/technique pin-down fields.
+# not the *plan*. Layer and technique selection are driven by the chosen attack
+# package (conversational advisor, or --package) — there are no layer/technique
+# pin-down fields.
 # ──────────────────────────────────────────────────────────────────────────
 class Manifest(BaseModel):
     campaign_id: str

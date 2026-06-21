@@ -3,6 +3,8 @@ from typing import Any
 from ..core.models import (
     Layer,
     Manifest,
+    Mode,
+    Package,
     ScanPlan,
     Scope,
     TargetProfile,
@@ -40,7 +42,7 @@ def scope_to_scan(
     seen: set[str] = set()
 
     # ADR-008: the manifest declares constraints, not the plan. Layer selection
-    # is driven entirely by the NL prompt via the ranker (scope.techniques_by_layer).
+    # is driven by the chosen package projected into scope.techniques_by_layer.
     active_layers: list[Layer] = [
         lyr for lyr in scope.techniques_by_layer if scope.techniques_by_layer[lyr]
     ]
@@ -103,3 +105,37 @@ def scope_to_scan(
         skipped=skipped,
         layer_cardinality=_resolve_layer_cardinality(set(by_layer)),
     )
+
+
+def scope_from_package(package: Package, registry: SkillRegistry) -> Scope:
+    """Project a chosen package into the Scope consumed by `scope_to_scan`: group
+    the package's techniques by layer. Pure projection — deferred/untargetable
+    filtering stays in `scope_to_scan` (the deterministic floor)."""
+    by_layer: dict[Layer, list[str]] = {}
+    for tid in package.techniques:
+        t = registry.techniques.get(tid)
+        if t is None:
+            continue
+        by_layer.setdefault(t.layer, []).append(tid)
+    return Scope(
+        selection_mode="package",
+        selected_package=package.id,
+        packages=[package.id],
+        techniques_by_layer=by_layer,
+        confidence=1.0,  # a human (or the deterministic default) authorized this package
+        rationale=f"package {package.id} selected",
+    )
+
+
+def default_package(mode: Mode, registry: SkillRegistry) -> Package:
+    """Deterministic non-interactive fallback when no package was chosen (no
+    ``--package``, and no Foundry/TTY for the advisor): a sensible default per
+    mode, so the coordinator's floor stays reproducible without an LLM."""
+    preferred = "PKG-RECON" if mode == "recon" else "PKG-QUICK"
+    pkg = registry.packages.get(preferred)
+    if pkg is not None:
+        return pkg
+    for p in registry.packages.values():         # last resort: any mode-eligible package
+        if mode in p.modes:
+            return p
+    raise RuntimeError(f"no package available for mode {mode!r}")

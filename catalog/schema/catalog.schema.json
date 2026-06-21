@@ -36,6 +36,7 @@
         },
         "scorer": { "type": "string", "enum": ["exfil_canary","leak_detector","output_markup","categorical_match","refusal_judge","judged_objective","cumulative_metric"] },
         "objectives": { "type": "array", "items": { "type": "string" } },
+        "success_criterion": { "type": "string", "$comment": "benign, observable success test fed to the LLM judge (decoupled from the attack objective)" },
         "severity_base": { "type": "string", "enum": ["critical", "high", "medium", "low", "info"] },
         "severity_track": { "type": "string", "enum": ["security", "content"] },
         "controls": { "type": "array", "items": { "type": "string" } },

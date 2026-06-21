@@ -1,3 +1,6 @@
+> **Note (2026-06):** the current fix log lives in `WORKLOG.md` (content-filter / judge /
+> canary work, and the ranker→advisor change). This file is the older design diary.
+
 cli.py
 
 main()  → argparse (--manifest --target --catalog --prompt --out)
