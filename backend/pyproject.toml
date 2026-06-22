@@ -41,6 +41,12 @@ dev = [
     "pytest>=8",
     "build>=1",
 ]
+# Local backend<->frontend bridge: serves frontend/index.html and runs a
+# campaign per prompt via POST /api/run (see server.py).
+bridge = [
+    "fastapi>=0.110,<1",
+    "uvicorn>=0.29,<1",
+]
 
 [project.scripts]
 trident = "src.cli:main"

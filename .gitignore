@@ -5,6 +5,8 @@ __pycache__/
 .pytest_cache/
 output/
 *.trace.jsonl
+# Committed demo fixture for the bridge's /api/sample + demo-mode fallback (server.py)
+!frontend/sample.trace.jsonl
 
 .env
 
