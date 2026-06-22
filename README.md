@@ -38,35 +38,44 @@ We deliberately keep the surface small:
 ## What's here
 
 ```
-trident/                  # the package
-├── core/                 # client, models (v0.3), policy_gate (5 rules), trace
-├── nl/                   # advisor (conversational package selector), scope_to_scan
-├── skills/               # base, registry (with JSON Schema validator), pyrit_runner
-├── agents/               # factory (build_vertical_session + make_pyrit_tools), briefs (enriched)
-├── orchestrator/         # coordinator (Phase 0–4), dispatch (agents-as-tools)
-├── targets/              # adapter Protocol, oracle (canary + placeholders), echo
-├── reports/              # correlator, html_report
-└── cli.py                # `python -m src.cli --manifest ... --prompt ...`
+backend/                  # all Python: engine, API, catalog, profiles
+├── src/
+│   ├── core/             # client, models (v0.3), policy_gate (5 rules), trace
+│   ├── nl/               # advisor (conversational package selector), scope_to_scan
+│   ├── skills/           # base, registry (with JSON Schema validator), pyrit_runner
+│   ├── agents/           # factory (build_vertical_session + make_pyrit_tools), briefs
+│   ├── orchestrator/     # coordinator (Phase 0–4), dispatch (agents-as-tools)
+│   ├── targets/          # adapter Protocol, oracle (canary + placeholders), echo
+│   ├── reports/          # correlator, html_report
+│   ├── web/              # web bridge: server (stdlib HTTP API) + engine + logbus
+│   └── cli.py            # `python -m src.cli --manifest ... --prompt ...`
+├── catalog/              # 20 techniques + 12 packages + JSON Schema + 5 reference docs
+│   ├── skills_catalog/   # one SKILL.md per technique — the single source of truth
+│   │   ├── TRD-PRM-*/SKILL.md  # 5 prompt techniques (frontmatter = full TechniqueConfig)
+│   │   ├── TRD-APP-*/SKILL.md  # 9 application techniques
+│   │   └── TRD-MOD-*/SKILL.md  # 6 model techniques (-004/-005/-006 deferred-mvp)
+│   ├── packages.yaml     # 12 packages: 4 profile + 3 layer + 5 focus
+│   └── schema/catalog.schema.json   # authoritative; validated at load time
+├── targets/              # declarative target profiles (v0.3)
+│   ├── echo.yaml         # in-process profile for smoke / unit tests
+│   ├── aigoat.yaml       # the reference vulnerable target
+│   └── target_profile.example.yaml
+├── manifests/            # Rules of Engagement as Code (ADR-008)
+│   ├── sample.yaml       # recon-mode smoke
+│   └── sample_attack.yaml  # attack-mode smoke
+├── run_web.cmd           # launches the web bridge (serves ../frontend on :8765)
+├── requirements.txt
+└── pyproject.toml
 
-catalog/                  # 20 techniques + 12 packages + JSON Schema + 5 reference docs
-├── skills_catalog/       # one SKILL.md per technique — the single source of truth
-│   ├── TRD-PRM-*/SKILL.md    # 5 prompt techniques (frontmatter = full TechniqueConfig)
-│   ├── TRD-APP-*/SKILL.md    # 9 application techniques
-│   └── TRD-MOD-*/SKILL.md    # 6 model techniques (-004/-005/-006 deferred-mvp)
-├── packages.yaml         # 12 packages: 4 profile + 3 layer + 5 focus
-└── schema/catalog.schema.json     # authoritative; validated at load time
-
-targets/                  # declarative target profiles (v0.3)
-├── echo.yaml             # in-process profile for smoke / unit tests
-├── aigoat.yaml           # the reference vulnerable target
-└── target_profile.example.yaml
-
-manifests/                # Rules of Engagement as Code (ADR-008)
-├── sample.yaml           # recon-mode smoke
-└── sample_attack.yaml    # attack-mode smoke
+frontend/                 # the web UI (served by the backend at /)
+└── frontend.html         # single-file TRIDENT console (planner, terminal, report)
 
                           # (tests/ suite is not wired on this demo branch — see "Tests" below)
 ```
+
+> **Layout note:** all CLI/web commands below run from inside `backend/`
+> (e.g. `cd backend; python -m src.cli ...`). The frontend is static and is
+> served by the backend web bridge — see **[Web UI](#web-ui)**.
 
 ---
 
@@ -98,6 +107,32 @@ environment.
 ---
 
 ## Run
+
+> All commands below run from inside `backend/` (`cd backend` first).
+
+### Web UI
+
+The frontend (`frontend/frontend.html`) is a single-file console — planner,
+live terminal, and report viewer. It is served by a tiny stdlib web bridge in
+`backend/src/web/` that exposes the engine over a JSON API (same-origin, no extra
+deps beyond the base install):
+
+```powershell
+cd backend
+run_web.cmd                 # http://localhost:8765  (default port)
+run_web.cmd --port 9000
+```
+
+`run_web.cmd` prefers the repo `.venv` and launches `python -m src.web.server`,
+which serves `../frontend/frontend.html` at `/` and exposes:
+
+- `GET  /api/health` — capability probe (engine, catalog counts, foundry/pyrit/sdk flags)
+- `GET  /api/packages`, `GET /api/techniques` — catalog data for the UI
+- `POST /api/plan` — package advisor (proposes packages, or asks to clarify)
+- `POST /api/campaign` — runs a recon/attack campaign, returns trace + correlated report
+- `GET  /api/logstream` — Server-Sent Events: the engine's live logs (web terminal)
+
+### CLI
 
 Every campaign goes through the SDK Coordinator and **requires Foundry**
 (`FOUNDRY_ENDPOINT` + `az login`, or `FOUNDRY_API_KEY`). The Echo target is
