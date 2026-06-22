@@ -176,7 +176,7 @@ async def _run(args: argparse.Namespace) -> None:
         # Augment the remediation section with grounded, web-searched
         # descriptions + sources (additive, shape-preserving; degrades to the
         # plain control list when web grounding is unconfigured).
-        corr["remediation"] = await enrich_remediation(
+        corr["remediation"] = await write_report(
             corr["remediation"], corr["findings"])
     finally:
         await client.stop()
