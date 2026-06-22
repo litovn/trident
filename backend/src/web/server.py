@@ -13,6 +13,8 @@ frontend HTML file at ``/`` and exposes a small JSON API the page calls:
                                      clarifying questions (propose / clarify)
     POST /api/campaign            -> run a recon/attack campaign, return the
                                      real trace.jsonl text + correlate() report
+    POST /api/websearch           -> Foundry web_search grounding: a grounded
+                                     answer + source URL citations for the web tool
 
 Run it with:
 
@@ -113,7 +115,7 @@ class TridentHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = urlparse(self.path).path
-        if path not in ("/api/campaign", "/api/plan"):
+        if path not in ("/api/campaign", "/api/plan", "/api/websearch"):
             return self._send_json({"error": "not found", "path": path}, status=404)
         try:
             body = self._read_json_body()
@@ -130,6 +132,15 @@ class TridentHandler(BaseHTTPRequestHandler):
             except Exception as exc:
                 log.exception("plan failed")
                 return self._send_json({"error": f"plan failed: {exc}"}, status=500)
+
+        if path == "/api/websearch":
+            query = str(body.get("query") or "").strip()
+            context_size = str(body.get("context_size") or "medium").strip().lower()
+            try:
+                return self._send_json(engine.web_search(query, context_size=context_size))
+            except Exception as exc:
+                log.exception("websearch failed")
+                return self._send_json({"error": f"web search failed: {exc}"}, status=500)
 
         # /api/campaign
         prompt = str(body.get("prompt") or "").strip()
