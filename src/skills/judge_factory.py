@@ -32,9 +32,12 @@ def _pyrit_base_url(raw_endpoint: str) -> str:
     env var.
 
     Idempotent: works whether ``FOUNDRY_ENDPOINT`` is bare or already
-    suffixed with ``/openai/v1``. Non-Azure-OpenAI hosts (Foundry
-    ``*.services.ai.azure.com`` / ``*.models.ai.azure.com``, custom) pass
-    through unchanged.
+    suffixed with ``/openai/v1``. The Azure OpenAI account host families that
+    serve the API under ``/openai`` — ``*.openai.azure.com``,
+    ``*.services.ai.azure.com`` (Foundry AI Services) and
+    ``*.cognitiveservices.azure.com`` — all receive the ``/openai/v1`` suffix.
+    Serverless MaaS hosts (``*.models.ai.azure.com``) and custom hosts expose
+    the inference API at the root and pass through unchanged.
     """
     raw = (raw_endpoint or "").strip().rstrip("/")
     if not raw:
@@ -45,7 +48,10 @@ def _pyrit_base_url(raw_endpoint: str) -> str:
         return raw
     host = (parsed.netloc or "").lower()
     path = parsed.path or ""
-    if host.endswith(".openai.azure.com"):
+    # Azure OpenAI account host families that serve the OpenAI API under
+    # ``/openai``. Serverless MaaS (``*.models.ai.azure.com``) is intentionally
+    # excluded — it exposes the inference API at the root and needs no suffix.
+    if host.endswith((".openai.azure.com", ".services.ai.azure.com", ".cognitiveservices.azure.com")):
         if "/openai/v1" in path or "/openai/deployments/" in path:
             return raw
         return f"{raw}/openai/v1"
