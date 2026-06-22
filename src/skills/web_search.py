@@ -29,6 +29,7 @@ Design notes (mirroring ``skills/pyrit_tools.py``):
 """
 import logging
 import os
+import re
 from typing import Any, Optional
 
 import httpx
@@ -104,8 +105,14 @@ async def _auth_headers(settings: FoundrySettings) -> Optional[dict]:
 
 
 def _parse_response(data: dict) -> dict:
-    """Extract grounded text + ``url_citation`` annotations from a Responses API
-    payload, tolerant of both the ``output`` and ``output_items`` shapes."""
+    """Extract grounded text + source URLs from a Responses API payload, tolerant
+    of both the ``output`` and ``output_items`` shapes.
+
+    Prefers structured ``url_citation`` annotations. Some Foundry deployments
+    return none and instead embed the sources inline in the answer text (e.g. a
+    "References:" list) — in that case we harvest the URLs from the text so the
+    report still gets citations.
+    """
     answer = (data.get("output_text") or "").strip()
     citations: list[dict] = []
     seen: set[str] = set()
@@ -126,6 +133,16 @@ def _parse_response(data: dict) -> dict:
                 if url and url not in seen:
                     seen.add(url)
                     citations.append({"url": url, "title": ann.get("title", "")})
+
+    # Fallback: this deployment returned no structured url_citation annotations and
+    # put the sources inline in the answer text — harvest those URLs so the report
+    # still gets citations.
+    if not citations and answer:
+        for url in re.findall(r"https?://[^\s)>\]]+", answer):
+            url = url.rstrip('.,;:!?)]}>"\'')
+            if url and url not in seen:
+                seen.add(url)
+                citations.append({"url": url, "title": ""})
 
     return {"answer": answer, "citations": citations}
 
