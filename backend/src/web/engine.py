@@ -725,6 +725,7 @@ def list_techniques() -> dict[str, Any]:
         out[t.id] = {
             "id": t.id,
             "name": t.name,
+            "desc": t.desc,
             "layer": t.layer,
             "owasp_id": t.owasp_id,
             "owasp_name": t.owasp_name,
@@ -737,17 +738,46 @@ def list_techniques() -> dict[str, Any]:
     return out
 
 
+def web_search(query: str, context_size: str = "medium") -> dict[str, Any]:
+    """Run one Foundry ``web_search`` grounded query for the UI's web-grounding tool.
+
+    Thin synchronous wrapper over ``skills.web_search.run_web_search`` — the *same*
+    grounding the agentic Coordinator calls as its ``web_search`` tool. It is SDK /
+    PyRIT-free and reuses the project's existing credentials: when no dedicated
+    ``FOUNDRY_PROJECT_ENDPOINT`` is set it falls back to ``FOUNDRY_ENDPOINT`` (the
+    same Foundry account the Coordinator/ranker authenticate against), so web
+    grounding works out of the box with the existing ``.env``. Returns the tool's
+    structured dict unchanged (``status`` / ``answer`` / ``citations``)."""
+    import dataclasses
+    from ..core.config import get_foundry_settings
+    from ..skills.web_search import run_web_search
+    q = (query or "").strip()
+    if not q:
+        return {"status": "error", "reason": "empty query", "answer": "", "citations": []}
+    ctx = (context_size or "medium").strip().lower()
+    settings = get_foundry_settings()
+    if not settings.responses_url and settings.endpoint:
+        # No dedicated project endpoint configured — reuse the main Foundry endpoint
+        # (the existing .env credentials) so grounding hits the same resource.
+        settings = dataclasses.replace(settings, project_endpoint=settings.endpoint)
+    return asyncio.run(run_web_search(q, context_size=ctx, settings=settings))
+
+
 def health() -> dict[str, Any]:
     """Capability probe — what's available in this environment."""
     registry = get_registry()
     foundry = bool(os.environ.get("FOUNDRY_ENDPOINT") or os.environ.get("AZURE_OPENAI_ENDPOINT"))
     agentic_ok, agentic_reason = agentic_available()
+    from ..core.config import get_foundry_settings
+    _fs = get_foundry_settings()
+    web_grounding = bool(_fs.responses_url or _fs.endpoint)
     return {
         "status": "ok",
         "engine": _selected_engine(),
         "agentic_available": agentic_ok,
         "agentic_reason": agentic_reason,
         "foundry_configured": foundry,
+        "web_grounding": web_grounding,
         "pyrit_installed": importlib.util.find_spec("pyrit") is not None,
         "sdk_installed": importlib.util.find_spec("copilot") is not None,
         "techniques": len(registry.techniques),

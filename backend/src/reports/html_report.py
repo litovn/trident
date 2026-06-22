@@ -92,7 +92,7 @@ def _remediation_section(rem: list[dict]) -> str:
         return ""
     items = "".join(
         f"<li>{_esc(r['control'])} "
-        f"<span class='muted'>— addresses {r['addresses_findings']} finding(s)</span>"
+        f"<span class='muted'>— addresses {r['addresses_findings']} finding(s)</span></li>"
         + (f"<div style='margin-top:.25rem'>{_esc(r['description'])}</div>"
            if r.get("description") else "")
         + _remediation_sources(r.get("sources", []))

@@ -193,11 +193,14 @@
   .composer{transition:box-shadow .18s, transform .18s}
   .composer:focus-within{box-shadow:inset 0 0 0 1px rgba(255,64,64,.55),0 0 0 3px rgba(255,40,40,.12),0 10px 34px rgba(180,20,30,.25)}
   /* Once a chat is active the input bar floats at the bottom and auto-hides; it peeks back when the cursor nears the bottom edge, and stays hidden while the 4 packages are on the table */
-  body.chat-on .composer-wrap{position:absolute;left:0;right:0;bottom:0;z-index:8;opacity:0;transform:translateY(120%);pointer-events:none;transition:opacity .26s ease, transform .28s ease}
+  body.chat-on .composer-wrap{position:absolute;left:0;right:0;bottom:0;z-index:8;opacity:1;transform:none;pointer-events:auto;transition:opacity .26s ease, transform .28s ease}
   body.chat-on.peek .composer-wrap,
   body.chat-on .composer-wrap:hover,
   body.chat-on .composer-wrap:focus-within{opacity:1;transform:none;pointer-events:auto}
   body.chat-on.pkg-open .composer-wrap{opacity:0!important;transform:translateY(120%)!important;pointer-events:none!important}
+  /* reserve room so the floating composer never overlaps the last chat bubbles */
+  body.chat-on .messages{padding-bottom:190px}
+  body.chat-on.pkg-open .messages{padding-bottom:40px}
   .send:not(:disabled){background:#e11d2a;color:#fff;box-shadow:0 0 14px rgba(225,29,42,.5)}
   .send:not(:disabled):hover{background:#f02534}
   .chip{transition:.16s}
@@ -246,7 +249,7 @@
 
   /* ===== DASHBOARD (non-scroll, balanced grid) ===== */
   .db-body{height:100%;min-height:0;display:grid;gap:clamp(9px,1.6vh,14px);padding:clamp(9px,1.6vh,14px) 22px clamp(10px,1.8vh,16px);overflow:hidden;
-    grid-template-columns:340px minmax(0,1fr) 340px;grid-template-rows:auto minmax(0,1fr) auto}
+    grid-template-columns:340px minmax(0,1fr) 340px;grid-template-rows:auto minmax(0,1fr)}
   .panel{border:1px solid rgba(255,255,255,.09);border-radius:16px;background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012));
     padding:clamp(11px,1.8vh,16px) 18px;min-height:0;overflow:hidden;position:relative;opacity:0;transform:translateY(14px);transition:opacity .5s ease,transform .5s ease}
   #dboard.show .panel{opacity:1;transform:none}
@@ -279,6 +282,8 @@
   .p-chain{grid-column:2;grid-row:2;display:flex;flex-direction:column}
   .ch-head{display:flex;align-items:center;gap:10px;margin-bottom:clamp(7px,1.3vh,12px)}
   .ch-head .ph{margin-bottom:0;flex:1}
+  .ch-max{width:26px;height:26px;border-radius:7px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.03);color:#9a9aa3;cursor:pointer;display:grid;place-items:center;padding:0;flex:0 0 auto;transition:background .15s,color .15s,border-color .15s}
+  .ch-max:hover{background:rgba(255,255,255,.1);color:#e7e7ea;border-color:rgba(255,255,255,.28)}
   .ch-full{height:30px;width:30px;padding:0;justify-content:center;font-size:15px;line-height:1;flex:0 0 auto}
   .chain-flow{flex:1;min-height:0;display:grid;grid-template-columns:repeat(var(--ccols,3),minmax(0,1fr));
     align-content:center;justify-items:stretch;gap:clamp(8px,1.4vh,12px);overflow:hidden;padding:2px}
@@ -323,6 +328,16 @@
   #chainFull .cstep{opacity:1;transform:none}
   #chainFull .cstep .tip{display:none}
   #chainFull .cstep .cx{display:block;width:100%;text-align:left;font-size:12.5px;line-height:1.5;color:#c4c4cc;margin-top:2px;padding-top:10px;border-top:1px solid rgba(255,255,255,.09)}
+  /* fullscreen "Attacks by layer" view (sized to content, centered in the page) */
+  #chainFull .cf-body{justify-content:center}
+  #chainFull .cf-cols{flex:0 1 auto;min-height:0;max-height:100%;display:grid;grid-template-columns:repeat(3,1fr);gap:34px;max-width:1100px;width:100%;margin:0 auto}
+  #chainFull .cf-cols .lcol-dot{width:34px;height:34px}
+  #chainFull .cf-cols .lcol-name{font-size:14px}
+  #chainFull .cf-cols .lcol-count{font-size:12px}
+  #chainFull .cf-cols .lcol-stem{height:22px}
+  #chainFull .cf-cols .lcol-atks{gap:13px;padding-top:6px}
+  #chainFull .cf-cols .latk-dot{width:13px;height:13px}
+  #chainFull .cf-cols .latk-name{font-size:14px;-webkit-line-clamp:3;line-clamp:3}
 
   /* right: per-layer success + findings by severity (two equal halves) */
   .p-side{grid-column:3;grid-row:2;display:flex;flex-direction:column;padding:0;overflow:hidden}
@@ -350,6 +365,50 @@
   .kpi b{display:block;font-family:ui-monospace,Consolas,monospace;font-size:clamp(20px,3vh,27px);font-weight:700;line-height:1}
   .kpi span{font-size:11px;color:#9a9aa3;margin-top:5px;display:block}
 
+  /* ===== per-layer attack columns (replaces the kill chain) ===== */
+  .p-chain .layer-cols{flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;overflow:hidden;padding-top:2px}
+  .lcol{display:flex;flex-direction:column;align-items:center;min-height:0;overflow:hidden}
+  .lcol-head{display:flex;flex-direction:column;align-items:center;gap:3px;flex:0 0 auto}
+  .lcol-dot{width:clamp(20px,3.2vh,28px);height:clamp(20px,3.2vh,28px);border-radius:50%;box-shadow:0 0 0 4px rgba(255,255,255,.05)}
+  .lcol-name{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+  .lcol-count{font-size:10px;color:#76767d;font-family:ui-monospace,monospace}
+  .lcol-stem{width:2px;height:clamp(8px,1.6vh,16px);flex:0 0 auto;opacity:.5;margin:1px 0}
+  .lcol-atks{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:clamp(5px,1vh,9px);align-items:stretch;width:100%;padding:2px 3px 4px}
+  .lcol-atks::-webkit-scrollbar{width:6px}.lcol-atks::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:6px}
+  .latk{display:flex;align-items:center;gap:8px;width:100%;opacity:0;transform:translateY(6px);transition:opacity .4s,transform .4s}
+  .latk.in{opacity:1;transform:none}
+  .latk-dot{width:11px;height:11px;border-radius:50%;flex:0 0 auto;box-shadow:0 0 8px -1px currentColor}
+  .latk-name{font-size:12px;color:#dfe3e8;line-height:1.25;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical}
+  .latk-empty{opacity:.45}
+  .latk-empty .latk-dot{background:#555!important;box-shadow:none}
+  .latk-empty .latk-name{font-style:italic;color:#76767d}
+  /* ===== attack-chain timeline replay (bottom) ===== */
+  .p-timeline{display:flex;flex-direction:column;gap:7px;min-height:0}
+  .p-timeline .tl-head{display:flex;align-items:center;gap:12px}
+  .p-timeline .tl-head .ph{margin-bottom:0;flex:1}
+  .tl-ctrls{display:flex;align-items:center;gap:6px}
+  .tl-btn{width:30px;height:30px;border-radius:8px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.03);color:#f4f4f5;font-size:15px;line-height:1;cursor:pointer;display:grid;place-items:center;transition:background .15s,border-color .15s}
+  .tl-btn:hover{background:rgba(255,255,255,.1)}
+  .tl-btn:disabled{opacity:.4;cursor:default}
+  .tl-btn.play.on{background:#e11d2a;border-color:transparent;color:#fff}
+  .tl-track{flex:1;min-height:0;display:flex;align-items:flex-start;gap:0;overflow-x:auto;overflow-y:hidden;padding:6px 2px}
+  .tl-track::-webkit-scrollbar{height:7px}.tl-track::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:7px}
+  .tl-step{display:flex;flex-direction:column;align-items:center;flex:0 0 auto;width:clamp(86px,11vw,128px)}
+  .tl-node{width:clamp(28px,4vh,34px);height:clamp(28px,4vh,34px);border-radius:50%;border:2px solid rgba(255,255,255,.16);background:rgba(255,255,255,.03);display:grid;place-items:center;flex:0 0 auto;transition:border-color .25s,background .25s,transform .25s,box-shadow .25s}
+  .tl-num{font-family:ui-monospace,monospace;font-weight:700;font-size:13px;color:#9a9aa3;transition:color .25s}
+  .tl-step.on .tl-node{border-color:var(--lc);background:rgba(255,255,255,.06)}
+  .tl-step.on .tl-num{color:#fff}
+  .tl-step.cur .tl-node{transform:scale(1.14);box-shadow:0 0 0 4px rgba(255,255,255,.08),0 0 14px -2px var(--lc)}
+  .tl-lbl{margin-top:7px;text-align:center;display:flex;flex-direction:column;gap:1px;max-width:100%;opacity:.5;transition:opacity .25s;cursor:pointer}
+  .tl-step.on .tl-lbl{opacity:1}
+  .tl-layer{font-size:9px;text-transform:uppercase;letter-spacing:.07em;font-weight:700}
+  .tl-title{font-size:11px;color:#cdd3da;line-height:1.2;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical}
+  .tl-conn{flex:0 0 auto;width:clamp(16px,2.4vw,44px);height:2px;background:rgba(255,255,255,.12);margin-top:clamp(13px,2vh,17px);border-radius:2px;transition:background .25s}
+  .tl-conn.on{background:#e11d2a}
+  .tl-detail{flex:0 0 auto;font-size:12px;color:#c3ccd6;line-height:1.4;padding:7px 12px;background:rgba(225,29,42,.06);border:1px solid rgba(225,29,42,.18);border-radius:9px;text-align:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .tl-detail b{color:#ff8f93}
+  .tl-empty{color:#76767d;font-size:13px;padding:10px}
+
   /* ===== SCAN overlay ===== */
   #scan{padding:0 9vw;display:none;flex-direction:column;justify-content:center;gap:6px;
     font-family:ui-monospace,Consolas,monospace;font-size:15px;line-height:1.7;color:#d7dad7}
@@ -373,6 +432,13 @@
   @keyframes actoolin{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
   .ac-tool .tk{color:#e7efe9;font-weight:600;overflow:hidden;text-overflow:ellipsis}
   .ac-tool .sp2,.ac-tool .tq,.ac-tool .res{display:none}
+  .ac-tool .tk-r{color:#9fb4ab;font-weight:500}
+  .ac-tool.loading{opacity:.8}
+  .ac-tool.ac-tool-ok{color:#cfeadd;background:rgba(95,175,138,.13);border-color:rgba(95,175,138,.5);cursor:pointer}
+  .ac-tool.ac-tool-ok .tk-r{color:#86c7a6}
+  .ac-tool.ac-tool-warn{color:#e6d6ad;background:rgba(205,180,95,.1);border-color:rgba(205,180,95,.45);cursor:pointer}
+  .ac-tool.ac-tool-warn .tk-r{color:#d9c074}
+  .ac-tool.ac-tool-ok:hover,.ac-tool.ac-tool-warn:hover{filter:brightness(1.18)}
   .ac-think{font-style:italic;color:#a7a7b0}
   /* recommended package card */
   .ac-pkg{max-width:560px;margin-top:12px;border:1px solid rgba(225,29,42,.3);border-radius:14px;overflow:hidden;background:linear-gradient(180deg,rgba(225,29,42,.07),rgba(255,255,255,.012))}
@@ -386,9 +452,21 @@
   .ac-pkg .pk-detail,.ac-opt .pk-detail{max-height:0;overflow:hidden;transition:max-height .45s ease}
   .ac-pkg .pk-detail.open,.ac-opt .pk-detail.open{max-height:300px;overflow-y:auto}
   .ac-pkg .pk-detail-in,.ac-opt .pk-detail-in{padding:6px 18px 4px;margin-top:10px;border-top:1px solid rgba(255,255,255,.08)}
-  .pk-tech{display:grid;grid-template-columns:54px 1fr auto;gap:11px;align-items:center;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05)}
-  .pk-tech:last-child{border-bottom:none}
+  .pk-tech-wrap{border-bottom:1px solid rgba(255,255,255,.05)}
+  .pk-tech-wrap:last-child{border-bottom:none}
+  .pk-tech{display:grid;grid-template-columns:54px 1fr auto auto;gap:11px;align-items:center;padding:9px 0}
   .pk-tech .tid{font-family:ui-monospace,monospace;font-size:11px;color:#9a9aa3}
+  .pk-tx{width:24px;height:24px;border-radius:7px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.03);color:#9a9aa3;cursor:pointer;display:grid;place-items:center;padding:0;transition:background .15s,color .15s}
+  .pk-tx:hover{background:rgba(255,255,255,.09);color:#e7e7ea}
+  .pk-tx.open{background:rgba(255,255,255,.09);color:#e7e7ea}
+  .pk-tx svg{transition:transform .2s ease}
+  .pk-tx.open svg{transform:rotate(180deg)}
+  .pk-tx-body{max-height:0;overflow:hidden;transition:max-height .3s ease}
+  .pk-tx-body.open{max-height:300px;padding-bottom:4px}
+  .pk-txd{font-size:12.5px;color:#c3ccd6;line-height:1.5;margin:0 0 8px;padding:2px 0 0}
+  .pk-txmeta{display:flex;flex-wrap:wrap;gap:5px 14px;padding-bottom:8px}
+  .pk-txmeta span{font-size:11.5px;color:#9a9aa3}
+  .pk-txmeta b{color:#cdd3da;font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-right:3px}
   .pk-tech .tn{font-size:13px;color:#e7e7ea}
   .pk-tech .tl{font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;font-weight:700;border-radius:5px;padding:2px 7px;text-align:center}
   .pk-tech .tl.prompt{background:rgba(95,176,196,.16);color:#7fc4d4}
@@ -406,14 +484,12 @@
   .ac-opts .ac-opt{display:flex;flex-direction:column}
   .ac-opts .ac-opt .op-acts{margin-top:auto}
   .ac-opt{--oc:#9a9aa3;--ocs:rgba(255,255,255,.05);--ocm:rgba(255,255,255,.2);--ocg:rgba(0,0,0,0);border:1px solid rgba(255,255,255,.1);border-left:3px solid var(--oc);border-radius:13px;overflow:hidden;cursor:pointer;background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012));transition:border-color .18s,box-shadow .18s,background .18s,opacity .18s}
-  /* packages keep their colour but start faded/translucent; hovering or selecting one brings it to full opacity */
-  .ac-opt:not(.sel){opacity:.45}
-  .ac-opt:not(.sel):hover{opacity:1}
+  /* gray by default; the package palette (set inline as --pc*) applies only on hover / selection */
+  .ac-opt:hover,.ac-opt.sel{--oc:var(--pc,#9a9aa3);--ocs:var(--pcs,rgba(255,255,255,.05));--ocm:var(--pcm,rgba(255,255,255,.2));--ocg:var(--pcg,rgba(0,0,0,0))}
   .ac-opt:hover{border-color:var(--ocm)}
   .ac-opt.sel{border-color:var(--ocm);background:linear-gradient(180deg,var(--ocs),rgba(255,255,255,.012));box-shadow:0 0 0 1px var(--ocm),0 8px 26px var(--ocg)}
   .ac-opt .op-head{display:flex;gap:12px;align-items:flex-start;padding:13px 15px 0}
   .ac-opt .op-rank{width:30px;height:30px;border-radius:9px;background:var(--ocs);color:var(--oc);display:grid;place-items:center;font-family:ui-monospace,monospace;font-weight:700;font-size:13px;flex:0 0 auto}
-  .ac-opt.best .op-rank{background:var(--oc);color:#fff}
   .ac-opt .op-main{flex:1;min-width:0}
   .ac-opt .op-kick{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--oc);font-weight:700;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .ac-opt .op-badge{font-size:9px;letter-spacing:.05em;background:var(--oc);color:#fff;border-radius:5px;padding:1px 6px}
@@ -464,10 +540,10 @@
   .panel{backdrop-filter:blur(8px) saturate(1.1);box-shadow:0 8px 30px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.05)}
   .panel:hover{border-color:rgba(255,255,255,.16)}
   #matrix{transition:transform .35s ease-out}
-  /* dashboard grid: add coverage row */
-  .db-body{grid-template-rows:auto minmax(0,1fr) auto auto !important}
-  .p-cov{grid-column:1/-1;grid-row:3;padding:11px 16px}
-  .p-kpis{grid-row:4 !important}
+  /* dashboard grid: verdict / main / timeline */
+  .db-body{grid-template-rows:auto minmax(0,1fr) auto !important}
+  .p-timeline{grid-column:1/-1;grid-row:3}
+  .p-cov{grid-column:1/-1;grid-row:4;padding:11px 16px}
   /* radar sweep */
   .gauge{position:relative;overflow:hidden}
   .sweep{position:absolute;inset:0;border-radius:50%;pointer-events:none;
@@ -527,6 +603,9 @@
   .rc-find .mid{font-family:ui-monospace,Consolas,monospace;font-size:11px;color:#7fe6f2;margin-left:6px}
   .rc-find .dsc{font-size:12.5px;color:#c7c9cc;margin-top:3px;line-height:1.45}
   .rc-plan{display:flex;flex-direction:column;gap:7px}
+  .rc-pwrap{border:1px solid rgba(255,255,255,.08);border-radius:9px;overflow:hidden}
+  .rc-pwrap .rc-prow{border:none;border-radius:0}
+  .rc-pwrap .pk-tx-body{padding-left:10px;padding-right:10px}
   .rc-prow{display:flex;align-items:center;gap:10px;font-size:13px;padding:7px 10px;border:1px solid rgba(255,255,255,.08);border-radius:9px}
   .rc-prow b{color:#fff;font-weight:600}
   .rc-prow .lz{font-size:10px;text-transform:uppercase;letter-spacing:.07em;padding:2px 7px;border-radius:5px;font-weight:700}
@@ -550,16 +629,14 @@
   .rc-opts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px;align-items:stretch}
   .rc-opts .rc-opt{display:flex;flex-direction:column}
   .rc-opts .rc-opt .rc-opt-acts{margin-top:auto}
-  .rc-opt{--oc:#36d1e0;--ocs:rgba(54,209,224,.07);--ocm:rgba(54,209,224,.5);--ocg:rgba(0,0,0,0);border:1px solid rgba(255,255,255,.1);border-left:3px solid var(--oc);border-radius:13px;overflow:hidden;background:rgba(255,255,255,.02);transition:border-color .15s,background .15s,box-shadow .15s,opacity .18s;cursor:pointer}
-  /* packages keep their colour but start faded/translucent; hovering or selecting one brings it to full opacity */
-  .rc-opt:not(.sel){opacity:.45}
-  .rc-opt:not(.sel):hover{opacity:1}
+  .rc-opt{--oc:#9a9aa3;--ocs:rgba(255,255,255,.05);--ocm:rgba(255,255,255,.2);--ocg:rgba(0,0,0,0);border:1px solid rgba(255,255,255,.1);border-left:3px solid var(--oc);border-radius:13px;overflow:hidden;background:rgba(255,255,255,.02);transition:border-color .15s,background .15s,box-shadow .15s,opacity .18s;cursor:pointer}
+  /* gray by default; the package palette (set inline as --pc*) applies only on hover / selection */
+  .rc-opt:hover,.rc-opt.sel{--oc:var(--pc,#9a9aa3);--ocs:var(--pcs,rgba(255,255,255,.05));--ocm:var(--pcm,rgba(255,255,255,.2));--ocg:var(--pcg,rgba(0,0,0,0))}
   .rc-opt:hover{border-color:var(--ocm)}
   .rc-opt.sel{border-color:var(--oc);background:var(--ocs);box-shadow:inset 0 0 0 1px var(--ocm)}
   .rc-opt.best.sel{box-shadow:inset 0 0 0 1px var(--ocm),0 8px 26px var(--ocg)}
   .rc-opt-head{display:flex;gap:13px;align-items:flex-start;padding:13px 15px}
   .rc-opt-ic{width:34px;height:34px;border-radius:9px;background:var(--ocs);color:var(--oc);display:grid;place-items:center;font-family:ui-monospace,Consolas,monospace;font-weight:700;font-size:13px;flex:0 0 auto}
-  .rc-opt.best .rc-opt-ic{background:var(--oc);color:#04141a}
   .rc-opt-ic svg{width:19px;height:19px}
   .rc-opt-main{flex:1;min-width:0}
   .rc-opt-kick{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--oc);font-weight:700;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -656,6 +733,46 @@
   .ttbl .tres{font-size:12.5px;font-weight:600;white-space:nowrap}
   .ttbl .tres .tri{margin-right:4px;font-size:11px}
 </style>
+<style id="websearch-css">
+  /* ===== WEB GROUNDING (Foundry web_search tool) ===== */
+  #websearch{position:fixed;inset:0;z-index:910;display:none;background:#0a0a0c;color:#f4f4f5;font-family:"universalSans",Inter,system-ui,sans-serif}
+  #websearch.on{display:block}
+  #websearch .rm-body{opacity:0;transform:translateY(10px);transition:opacity .4s,transform .4s}
+  #websearch.show .rm-body{opacity:1;transform:none}
+  .ws-bar{display:flex;gap:10px;align-items:stretch;margin:2px 0 14px;max-width:920px}
+  .ws-input{flex:1;background:#141418;border:1px solid rgba(255,255,255,.12);border-radius:10px;color:#f4f4f5;font:inherit;font-size:15px;padding:13px 15px;outline:none;transition:border-color .15s}
+  .ws-input:focus{border-color:#e11d2a}
+  .ws-input::placeholder{color:#6b6b73}
+  .ws-ctx{background:#141418;border:1px solid rgba(255,255,255,.12);border-radius:10px;color:#cfcfd6;font:inherit;font-size:13px;padding:0 10px;cursor:pointer}
+  #websearch .db-btn.red{background:#e11d2a;border-color:transparent;color:#fff;font-weight:600;padding:0 22px}
+  #websearch .db-btn.red:hover{background:#f02534}
+  .ws-chips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 22px}
+  .ws-chip{cursor:pointer;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:20px;color:#b9b9c0;font:inherit;font-size:12.5px;padding:6px 13px;transition:.15s}
+  .ws-chip:hover{background:rgba(225,29,42,.12);border-color:rgba(225,29,42,.4);color:#fff}
+  .ws-out{max-width:920px}
+  .ws-load{display:flex;align-items:center;gap:11px;color:#b9b9c0;font-size:14px;padding:18px 0}
+  .ws-spin{width:16px;height:16px;border:2px solid rgba(255,255,255,.18);border-top-color:#e11d2a;border-radius:50%;animation:wsspin .7s linear infinite;flex:none}
+  @keyframes wsspin{to{transform:rotate(360deg)}}
+  .ws-state{border-radius:12px;padding:18px 20px;display:flex;flex-direction:column;gap:7px;border:1px solid}
+  .ws-state b{font-size:15px;font-weight:700}
+  .ws-state span{font-size:13.5px;line-height:1.5;color:#b9b9c0}
+  .ws-state code{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:#cfcfd6;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:8px 11px;margin-top:4px;white-space:pre-wrap;word-break:break-all}
+  .ws-state.warn{border-color:rgba(205,180,95,.4);background:rgba(205,180,95,.07)}
+  .ws-state.warn b{color:#e6cf73}
+  .ws-state.err{border-color:rgba(224,72,79,.4);background:rgba(224,72,79,.07)}
+  .ws-state.err b{color:#ff5258}
+  .ws-ans{border:1px solid rgba(255,255,255,.1);border-left:3px solid #5fb0c4;border-radius:12px;padding:16px 18px;margin-bottom:16px;background:rgba(95,176,196,.05)}
+  .ws-ah{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#5fb0c4;font-weight:700;margin-bottom:8px}
+  .ws-atext{font-size:14.5px;line-height:1.65;color:#eef2f6;white-space:pre-wrap}
+  .ws-cites{border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px 16px}
+  .ws-ch{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#69727e;font-weight:700;margin-bottom:10px}
+  .ws-cite{display:flex;align-items:flex-start;gap:11px;text-decoration:none;padding:9px 10px;border-radius:9px;transition:background .15s}
+  .ws-cite:hover{background:rgba(255,255,255,.04)}
+  .ws-ci{flex:0 0 auto;width:22px;height:22px;border-radius:6px;background:rgba(95,176,196,.16);color:#9fd4de;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;font-family:ui-monospace,monospace}
+  .ws-ct{display:flex;flex-direction:column;min-width:0}
+  .ws-ct b{font-size:13.5px;color:#cfe6ec;font-weight:600;line-height:1.35}
+  .ws-ct span{font-size:12px;color:#7d8893;word-break:break-all}
+</style>
 <style id="export-css">
   /* ===== EXECUTIVE EXPORT (light / white, print-ready) ===== */
   #exportReport{position:fixed;inset:0;z-index:950;display:none;background:#ffffff;color:#1f1f24;overflow:auto;
@@ -721,6 +838,23 @@
   .xr-gloss{display:grid;grid-template-columns:1fr 1fr;gap:10px 22px;margin-top:6px}
   .xr-gt{font-size:12.5px;font-weight:700;color:#15151a}
   .xr-gd{font-size:12px;color:#6b6b73;line-height:1.45;margin-top:2px}
+  .xr-ground{border:1px solid rgba(0,0,0,.1);border-radius:10px;padding:12px 14px;background:#f7f7f9;margin-top:4px}
+  .xr-groundh{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#8a8a92;margin-bottom:5px}
+  .xr-groundt{font-size:13px;color:#1f1f24;line-height:1.55}
+  .xr-groundt p{margin:0 0 8px}
+  .xr-groundt p:last-child{margin-bottom:0}
+  .xr-groundt ul,.xr-groundt ol{margin:4px 0 10px;padding-left:22px;display:flex;flex-direction:column;gap:3px}
+  .xr-groundt li{margin:0;line-height:1.5}
+  .xr-groundt b{color:#15151a}
+  .xr-groundt code{background:rgba(0,0,0,.06);border-radius:4px;padding:1px 5px;font-family:ui-monospace,monospace;font-size:12px}
+  .xr-groundt a{color:#2f6db0;text-decoration:underline;word-break:break-word}
+  .xr-gh{font-weight:700;color:#15151a;font-size:13.5px;margin:11px 0 4px}
+  .xr-groundt .xr-gh:first-child{margin-top:0}
+  .xr-srch{font-size:12.5px;font-weight:700;color:#15151a;margin:14px 0 6px}
+  .xr-srclist{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+  .xr-srclist li{font-size:12px;line-height:1.4}
+  .xr-srct{font-weight:600;color:#15151a}
+  .xr-srcu{color:#2f6db0;font-family:ui-monospace,monospace;font-size:11px;word-break:break-all}
   .xr-foot{margin-top:34px;padding-top:16px;border-top:1px solid rgba(0,0,0,.1);font-size:11px;color:#8a8a92;line-height:1.6}
   .xr-ctsub{font-weight:600;color:#6b6b73;font-size:11px;margin-left:6px}
   .xr-badge{float:right;font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px;border:1px solid}
@@ -941,6 +1075,11 @@
         if(go)go.onclick=function(){if(window.TRIDENT_launch)window.TRIDENT_launch("",cc.trace,true);if(window.innerWidth<=760)document.body.classList.add("collapsed");};
         card.addEventListener("click",function(){var grp=card.closest(".ac-opts")||messagesEl;grp.querySelectorAll(".ac-opt").forEach(function(x){x.classList.remove("sel");});card.classList.add("sel");});
       });
+      // re-wire the per-technique "explain" arrows (their handlers aren't part of the saved HTML)
+      messagesEl.querySelectorAll('.pk-tx').forEach(function(btn){
+        btn.onclick=function(e){e.stopPropagation();var wp=btn.closest('.pk-tech-wrap, .rc-pwrap');if(!wp)return;
+          var bd=wp.querySelector('.pk-tx-body');var op=btn.classList.toggle('open');if(bd)bd.classList.toggle('open',op);};
+      });
     }
     if(c.trace){
       const sum=(window.TRIDENT&&window.TRIDENT.summarize)?window.TRIDENT.summarize(c.trace):null;
@@ -1025,12 +1164,6 @@
     }
   }
   function grow(){input.style.height="auto";input.style.height=Math.min(input.scrollHeight,200)+"px";}
-
-  // Peek the auto-hidden input bar back when the cursor nears the bottom edge (only during an active chat)
-  document.addEventListener("mousemove",function(e){
-    if(!document.body.classList.contains("chat-on"))return;
-    document.body.classList.toggle("peek",e.clientY>=window.innerHeight-96);
-  },{passive:true});
 
   $("#newChat").addEventListener("click",newChat);
   $("#clearAll").addEventListener("click",()=>{
@@ -1131,6 +1264,7 @@
 <div id="remed"></div>
 <div id="evid"></div>
 <div id="techs"></div>
+<div id="websearch"></div>
 <div id="exportReport"></div>
 
 <script>
@@ -1411,11 +1545,27 @@ const REPORT = {
         owasp:(t.owasp_id&&t.owasp_id!=='N/A')?t.owasp_id:'',
         atlas:t.atlas_technique||t.atlas_tactic||'',
         sev:SEVMAP[t.severity_base]||c.sev||'info',
+        desc:t.desc||c.desc||'',
         ctrl:(t.controls&&t.controls.length)?t.controls:(c.ctrl||[])};
       var rm=t.remediation;
       if(rm&&rm.title)RFIX[id]={t:rm.title,w:rm.why||'',ic:rm.icon||(RFIX[id]&&RFIX[id].ic)||'shield'};
     });
   };
+
+  // Build the per-technique explanation shown by the down-arrow inside a package
+  // card, straight from the catalog entry (desc + OWASP/ATLAS/severity/controls).
+  function techExplain(id,c){
+    c=c||CATALOG[id]||{};
+    var d=c.desc||'';
+    if(!d){var rf=RFIX[id];d=(rf&&rf.w)||('A '+(c.layer||'catalog')+'-layer attack technique.');}
+    var bits=[];
+    var map=[c.owasp?('OWASP '+c.owasp):'',c.atlas?('ATLAS '+c.atlas):''].filter(Boolean).join(' \u00b7 ');
+    if(map)bits.push('<span><b>Maps to</b> '+esc2(map)+'</span>');
+    var sevTxt={crit:'Critical',high:'High',med:'Medium',low:'Low',info:'Info'}[c.sev]||(c.sev||'');
+    if(sevTxt)bits.push('<span><b>Severity</b> '+esc2(sevTxt)+'</span>');
+    if(c.ctrl&&c.ctrl.length)bits.push('<span><b>Defended by</b> '+esc2(c.ctrl.join(', '))+'</span>');
+    return '<p class="pk-txd">'+esc2(d)+'</p>'+(bits.length?'<div class="pk-txmeta">'+bits.join('')+'</div>':'');
+  }
 
   function parseTrace(text){
     var rows=[];
@@ -1681,8 +1831,71 @@ const REPORT = {
       xrStackBar([{label:'P1 \u00b7 now',c:'#e0484f',v:p1},{label:'P2 \u00b7 next',c:'#d99a55',v:p2}])+'</div>';
   }
 
+  // ---------- WEB GROUNDING for the PDF (auto-fetched once per report) ----------
+  function groundingQuery(){
+    var tgt=xrStrip((typeof fact==='function'&&fact('Target'))||(R&&R.meta&&(R.meta.target||R.meta.targetName))||'the target AI system');
+    var wins=((R&&R.techniques)||[]).filter(function(t){return t.state==='success'||t.state==='confirmed';});
+    var names=wins.slice(0,3).map(function(t){return t.what;}).filter(Boolean);
+    if(names.length)return 'Recommended mitigations and recent public advisories for these AI red-team techniques against '+tgt+': '+names.join('; ')+'.';
+    return 'OWASP LLM Top 10 mitigations and current prompt-injection and jailbreak defenses relevant to '+tgt+'.';
+  }
+  function startGrounding(){
+    if(!R||R._grounding)return;                        // one fetch per report
+    if(!(window.TRIDENT_API&&window.TRIDENT_API.websearch)){R._grounding={status:'unavailable',reason:'web API unavailable'};return;}
+    var q=groundingQuery();
+    R._grounding={status:'loading',query:q};
+    window.TRIDENT_API.websearch(q,'medium').then(function(res){
+      res=res||{status:'error'};res.query=q;R._grounding=res;refreshGrounding();
+    },function(e){
+      R._grounding={status:'error',query:q,reason:String((e&&e.message)||e)};refreshGrounding();
+    });
+  }
+  function refreshGrounding(){var el=document.getElementById('xr-grounding');if(el)el.innerHTML=groundingHtml();}
+  // minimal, injection-safe markdown -> HTML for the grounded answer (escape first, then add a safe tag subset)
+  function mdInline(s){
+    s=s.replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/__([^_]+)__/g,'<b>$1</b>');
+    s=s.replace(/`([^`]+)`/g,'<code>$1</code>');
+    s=s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,function(m,t,u){return '<a href="'+u.replace(/"/g,'%22')+'" target="_blank" rel="noopener noreferrer">'+t+'</a>';});
+    return s;
+  }
+  function mdLite(raw){
+    var lines=esc2(String(raw||'')).split(/\r?\n/);
+    var out=[],lt=null;
+    function close(){if(lt){out.push('</'+lt+'>');lt=null;}}
+    for(var i=0;i<lines.length;i++){
+      var t=lines[i].trim();
+      if(!t){close();continue;}
+      var h=/^(#{1,6})\s+(.*)$/.exec(t);
+      if(h){close();out.push('<div class="xr-gh">'+mdInline(h[2])+'</div>');continue;}
+      var u=/^[-*\u2022]\s+(.*)$/.exec(t);
+      if(u){if(lt!=='ul'){close();out.push('<ul>');lt='ul';}out.push('<li>'+mdInline(u[1])+'</li>');continue;}
+      var o=/^(\d+)[.)]\s+(.*)$/.exec(t);
+      if(o){if(lt!=='ol'){close();out.push('<ol>');lt='ol';}out.push('<li value="'+o[1]+'">'+mdInline(o[2])+'</li>');continue;}
+      close();out.push('<p>'+mdInline(t)+'</p>');
+    }
+    close();
+    return out.join('')||('<p>'+esc2(String(raw||''))+'</p>');
+  }
+  function groundingHtml(){
+    var g=(R&&R._grounding)||{status:'idle'};
+    if(g.status==='loading'||g.status==='idle')
+      return '<div class="xr-sint">Gathering live public-web intelligence to ground this report'+(g.query?' \u2014 \u201c'+esc2(g.query)+'\u201d':'')+'\u2026</div>';
+    if(g.status==='unavailable')
+      return '<div class="xr-sint">Web grounding is not configured for this run'+(g.reason?' ('+esc2(g.reason)+')':'')+', so no external sources were attached.</div>';
+    if(g.status!=='ok')
+      return '<div class="xr-sint">Web grounding could not complete'+(g.reason?': '+esc2(g.reason):'')+'.</div>';
+    var cz=(g.citations||[]);
+    var srcs=cz.length
+      ? '<ol class="xr-srclist">'+cz.map(function(c){var u=c.url||'';var t=(c.title||u)||'source';return '<li><span class="xr-srct">'+esc2(t)+'</span> <span class="xr-srcu">'+esc2(u)+'</span></li>';}).join('')+'</ol>'
+      : '<div class="xr-sint" style="margin-top:6px">No source citations were returned for this query.</div>';
+    return (g.query?'<p class="xr-sint"><b>Query:</b> '+esc2(g.query)+'</p>':'')+
+      '<div class="xr-ground"><div class="xr-groundh">Grounded summary</div><div class="xr-groundt">'+mdLite(g.answer||'(the tool returned no answer text)')+'</div></div>'+
+      '<div class="xr-srch">Sources \u00b7 '+cz.length+'</div>'+srcs;
+  }
+
   function buildExport(){
     if(!R||!M){return;}
+    startGrounding();
     var v=R.verdict||{}, VC=R.verdictColor||'#e0484f';
     var riskWord=M.criticals>0?'HIGH':(M.okN>0?'MEDIUM':'LOW');
     var riskColor=M.criticals>0?'#e0484f':(M.okN>0?'#d99a55':'#3f9e6b');
@@ -1861,6 +2074,10 @@ const REPORT = {
         '<p class="xr-sint">'+esc2((R.fixes&&R.fixes.intro)||'Prioritised actions. P1 breaks the attack chain, P2 closes remaining gaps.')+'</p>'+fixesHtml+
         (lvHtml?'<div class="xr-subh">'+esc2((lv&&lv.title)||'Then prove the fixes work')+'</div><p class="xr-sint">'+esc2((lv&&lv.intro)||'')+'</p><div class="xr-levels">'+lvHtml+'</div>':'')+'</div>'+
 
+      '<div class="xr-section"><div class="xr-sh"><span class="xr-num">11</span>External intelligence (web grounding)</div>'+
+        '<p class="xr-sint">Live public-web context retrieved automatically by the Foundry <b>web_search</b> tool to enrich these findings. Treat as untrusted external input and verify the sources.</p>'+
+        '<div id="xr-grounding">'+groundingHtml()+'</div></div>'+
+
       '<div class="xr-foot">Scored against MITRE ATLAS and the OWASP GenAI Top 10, with severity following the Microsoft MSRC AI bug bar. '+
         'This report was generated automatically by '+esc2(brand)+' from the run trace. Findings marked Confirmed carry deterministic evidence; '+
         'Succeeded findings reflect an automated scorer\u2019s judgement.</div>'+
@@ -1887,11 +2104,22 @@ const REPORT = {
   // ---------- DASHBOARD ----------
   function buildDash(){
     var v=R.verdict||{}, VC=R.verdictColor||'#9a9aa3';
-    var chain=(R.chain&&R.chain.steps||[]).map(function(s,i){
-      return '<div class="cstep '+s.layer+'" data-i="'+i+'"><div class="cn">'+(i+1)+'</div>'+
-        '<div class="cl">'+s.layer+'</div><div class="ct">'+s.title+'</div><div class="cid">'+(s.id||'')+'</div>'+
-        '<div class="tip"><b>'+(s.id||'')+'</b> '+esc2(s.title)+'</div></div>';
+    var LCOL=[{k:'prompt',n:'Prompt',c:'#5fb0c4'},{k:'application',n:'Application',c:'#9b8cbb'},{k:'model',n:'Model',c:'#c2879f'}];
+    var STC={confirmed:'#74b08e',success:'#74b08e',assessed:'#5fb0c4',failed:'#8d98a6',blocked:'#cdb45f'};
+    var layerCols=LCOL.map(function(L){
+      var atks=(R.techniques||[]).filter(function(t){return t.layer===L.k;});
+      var dots=atks.map(function(t){var col=STC[t.state]||'#8d98a6';
+        return '<div class="latk"><span class="latk-dot" style="background:'+col+';color:'+col+'"></span><span class="latk-name" title="'+esc2(t.id||'')+'">'+esc2(t.what||t.id||'')+'</span></div>';
+      }).join('')||'<div class="latk latk-empty"><span class="latk-dot"></span><span class="latk-name">no attacks</span></div>';
+      return '<div class="lcol '+L.k+'"><div class="lcol-head"><span class="lcol-dot" style="background:'+L.c+'"></span><span class="lcol-name" style="color:'+L.c+'">'+L.n+'</span><span class="lcol-count">'+atks.length+'</span></div><div class="lcol-stem" style="background:'+L.c+'"></div><div class="lcol-atks">'+dots+'</div></div>';
     }).join('');
+    var tlSteps=(R.chain&&R.chain.steps||[]);
+    var LLC={prompt:'#5fb0c4',application:'#9b8cbb',model:'#c2879f'};
+    var tlNodes='';
+    tlSteps.forEach(function(s,i){var lc=LLC[s.layer]||'#9a9aa3';
+      if(i>0)tlNodes+='<div class="tl-conn" data-i="'+i+'"></div>';
+      tlNodes+='<div class="tl-step" data-i="'+i+'" style="--lc:'+lc+'"><div class="tl-node"><span class="tl-num">'+(i+1)+'</span></div><div class="tl-lbl"><span class="tl-layer" style="color:'+lc+'">'+esc2(s.layer||'')+'</span><span class="tl-title">'+esc2(s.title||'')+'</span></div></div>';
+    });
     var layerRows=M.layers.map(function(l){
       return '<div class="lrow"><div class="ln"><i style="background:'+l.c+'"></i>'+l.n+'</div>'+
         '<div class="lbar"><i data-pct="'+l.pct+'" style="background:'+l.c+'"></i></div>'+
@@ -1903,12 +2131,6 @@ const REPORT = {
         '<div class="bar" data-h="'+hpx+'" style="background:'+s.c+'"></div><div class="cl">'+s.l+'</div></div>';
     }).join('');
     var cov=(R.coverage||[]).map(function(c){return '<div class="cov cov-'+c.status+'" title="'+esc2(c.name)+': '+c.status+'"><b>'+c.id+'</b><span>'+esc2(c.name)+'</span></div>';}).join('');
-    var kpis=[
-      ['asr',M.asr+'%','attack success','#ff5258'],['fired',M.fired,'techniques fired','#f4f4f5'],
-      ['confirmed',M.confirmed,'proven w/ evidence','#74b08e'],['criticals',M.criticals,'reached critical','#ff5258'],
-      ['blocked',M.blocked,'gate-blocked','#cdb45f']
-    ].map(function(k){return '<div class="kpi"><b data-count="'+(typeof k[1]==='string'?k[1].replace('%',''):k[1])+'" data-suf="'+(String(k[1]).indexOf('%')>=0?'%':'')+'" style="color:'+k[3]+'">0'+(String(k[1]).indexOf('%')>=0?'%':'')+'</b><span>'+k[2]+'</span></div>';}).join('');
-
     var body='<div class="db-body">'+
       '<div class="panel p-verdict" style="border-left:3px solid '+VC+'"><span class="ic" style="background:'+VC+'29;color:'+VC+'"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l9 16H3l9-16z" stroke-linejoin="round"/><path d="M12 10v4"/><circle cx="12" cy="16.6" r="1" fill="currentColor"/></svg></span>'+
         '<div><div class="vt" style="color:'+VC+'">'+(v.label||'')+'</div><div class="vd">'+(v.text||'')+'</div></div></div>'+
@@ -1922,15 +2144,21 @@ const REPORT = {
             '<div class="gstat"><b style="color:#cdb45f">'+M.blocked+'</b><span>Blocked</span></div>'+
           '</div>'+
         '</div></div>'+
-      '<div class="panel p-chain"><div class="ch-head"><div class="ph">Kill chain \u00b7 '+(R.chain&&R.chain.steps?R.chain.steps.length:0)+' steps</div><button class="db-btn ch-full" id="db-chainfull" title="Open fullscreen">\u2922</button></div>'+
-        '<div class="chain-flow">'+chain+'</div>'+
-        '<div class="cbar">'+(R.chain&&R.chain.outcome||'')+'</div></div>'+
+      '<div class="panel p-chain"><div class="ch-head"><div class="ph">Attacks by layer</div>'+
+        '<button class="ch-max" id="db-layers-full" type="button" title="Maximize" aria-label="Maximize attacks by layer"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg></button></div>'+
+        '<div class="layer-cols">'+layerCols+'</div></div>'+
       '<div class="panel p-side">'+
         '<div class="ps-sec"><div class="ph">Per-layer success</div><div class="lrows">'+layerRows+'</div></div>'+
         '<div class="ps-div"></div>'+
         '<div class="ps-sec"><div class="ph">Findings by severity</div><div class="sev">'+sevCols+'</div></div>'+
       '</div>'+
-      '<div class="p-kpis">'+kpis+'</div>'+
+      '<div class="panel p-timeline">'+
+        '<div class="tl-head"><div class="ph">Attack chain replay \u00b7 step <span id="tl-pos">1</span> / '+tlSteps.length+'</div>'+
+          '<div class="tl-ctrls"><button class="tl-btn" id="tl-prev" title="Step back">\u2039</button>'+
+          '<button class="tl-btn play" id="tl-play" title="Play / pause">\u25b6</button>'+
+          '<button class="tl-btn" id="tl-next" title="Step forward">\u203a</button></div></div>'+
+        '<div class="tl-track" id="tl-track">'+(tlNodes||'<div class="tl-empty">No attack chain to replay.</div>')+'</div>'+
+        '<div class="tl-detail" id="tl-detail"></div></div>'+
       '</div>';
 
     document.getElementById('dboard').innerHTML=
@@ -1940,12 +2168,9 @@ const REPORT = {
     document.getElementById('db-evid').onclick=function(){buildEvid();show('evid');};
     document.getElementById('db-export').onclick=function(){buildExport();show('exportReport');};
     document.getElementById('db-rem').onclick=function(){buildRem();show('remed');};
-    document.getElementById('db-chainfull').onclick=function(){openChainFull();};
-    reshapeChain();
-    if(!window.__chainResizeBound){window.__chainResizeBound=1;
-      window.addEventListener('resize',function(){reshapeChain();
-        var cf=document.getElementById('chainFull');
-        if(cf&&cf.classList.contains('on'))reshapeFlow(cf.querySelector('.chain-flow'));});}
+    var dlf=document.getElementById('db-layers-full');if(dlf)dlf.onclick=openLayersFull;
+    setupTimeline();
+    startGrounding();
   }
 
   // Compute the best column count for a given chain-flow element and apply it
@@ -1969,22 +2194,23 @@ const REPORT = {
     reshapeFlow(d.querySelector('.chain-flow'));
   }
 
-  // Open the kill chain in a dedicated fullscreen view
-  function openChainFull(){
-    var steps=(R.chain&&R.chain.steps||[]);
-    var chain=steps.map(function(s,i){
-      return '<div class="cstep '+s.layer+'" data-i="'+i+'"><div class="cn">'+(i+1)+'</div>'+
-        '<div class="cl">'+s.layer+'</div><div class="ct">'+s.title+'</div><div class="cid">'+(s.id||'')+'</div>'+
-        (s.note?'<div class="cx">'+esc2(xrStrip(s.note))+'</div>':'')+'</div>';
+  // Open the per-layer attack columns in a dedicated fullscreen view
+  function openLayersFull(){
+    var LCOL=[{k:'prompt',n:'Prompt',c:'#5fb0c4'},{k:'application',n:'Application',c:'#9b8cbb'},{k:'model',n:'Model',c:'#c2879f'}];
+    var STC={confirmed:'#74b08e',success:'#74b08e',assessed:'#5fb0c4',failed:'#8d98a6',blocked:'#cdb45f'};
+    var cols=LCOL.map(function(L){
+      var atks=(R.techniques||[]).filter(function(t){return t.layer===L.k;});
+      var dots=atks.map(function(t){var col=STC[t.state]||'#8d98a6';
+        return '<div class="latk in"><span class="latk-dot" style="background:'+col+';color:'+col+'"></span><span class="latk-name" title="'+esc2(t.id||'')+'">'+esc2(t.what||t.id||'')+'</span></div>';
+      }).join('')||'<div class="latk latk-empty in"><span class="latk-dot"></span><span class="latk-name">no attacks</span></div>';
+      return '<div class="lcol '+L.k+'"><div class="lcol-head"><span class="lcol-dot" style="background:'+L.c+'"></span><span class="lcol-name" style="color:'+L.c+'">'+L.n+'</span><span class="lcol-count">'+atks.length+'</span></div><div class="lcol-stem" style="background:'+L.c+'"></div><div class="lcol-atks">'+dots+'</div></div>';
     }).join('');
     var el=document.getElementById('chainFull');
-    el.innerHTML='<div class="cf-top"><h2>Kill chain \u00b7 '+steps.length+' steps</h2><span class="sp"></span>'+
+    el.innerHTML='<div class="cf-top"><h2>Attacks by layer</h2><span class="sp"></span>'+
       '<button class="db-btn" id="cf-close">Close \u2715</button></div>'+
-      '<div class="cf-body"><div class="chain-flow cf-flow">'+chain+'</div>'+
-      '<div class="cbar">'+(R.chain&&R.chain.outcome||'')+'</div></div>';
+      '<div class="cf-body"><div class="layer-cols cf-cols">'+cols+'</div></div>';
     document.getElementById('cf-close').onclick=function(){hide('chainFull');};
     show('chainFull');
-    reshapeFlow(el.querySelector('.chain-flow'));
   }
 
   function animateDash(){
@@ -2004,12 +2230,8 @@ const REPORT = {
       d.querySelectorAll('.lbar i').forEach(function(i){i.style.width=i.getAttribute('data-pct')+'%';});
       d.querySelectorAll('.sev .bar').forEach(function(b){b.style.height=b.getAttribute('data-h')+'%';});
     },300);
-    // kill chain: connector draw + traveling pulse + sequential node light-up
-    reshapeChain();
-    var flow=d.querySelector('.chain-flow'), pulse=d.querySelector('.chain-pulse'), steps=d.querySelectorAll('.cstep');
-    if(pulse){pulse.style.display=(flow&&flow.classList.contains('single'))?'':'none';}
-    if(pulse&&steps.length&&flow&&flow.classList.contains('single')){pulse.style.animation='travel '+(steps.length*0.34+0.4)+'s ease-in-out .5s 1';}
-    steps.forEach(function(s,i){setTimeout(function(){s.classList.add('in');},500+i*340);});
+    // per-layer attacks reveal (staggered)
+    d.querySelectorAll('.latk').forEach(function(a,i){a.style.transitionDelay=(i*40)+'ms';setTimeout(function(){a.classList.add('in');},350);});
     // OWASP heatmap reveal
     d.querySelectorAll('.cov').forEach(function(c,i){c.style.transitionDelay=(i*45)+'ms';setTimeout(function(){c.classList.add('in');},700);});
     // kpi count
@@ -2019,6 +2241,38 @@ const REPORT = {
         b.textContent=Math.round(to*e)+suf;if(p<1)requestAnimationFrame(cs);}
       setTimeout(function(){requestAnimationFrame(cs);},250);
     });
+  }
+
+  // ---------- ATTACK CHAIN TIMELINE (forward/back replay) ----------
+  function setupTimeline(){
+    var steps=(R.chain&&R.chain.steps||[]);
+    var track=document.getElementById('tl-track'); if(!track)return;
+    var stepEls=[].slice.call(track.querySelectorAll('.tl-step'));
+    var connEls=[].slice.call(track.querySelectorAll('.tl-conn'));
+    var posEl=document.getElementById('tl-pos'), detail=document.getElementById('tl-detail');
+    var prev=document.getElementById('tl-prev'), next=document.getElementById('tl-next'), play=document.getElementById('tl-play');
+    if(!steps.length){if(detail)detail.style.display='none';[prev,next,play].forEach(function(b){if(b)b.disabled=true;});return;}
+    var pos=steps.length-1, timer=null;
+    function render(){
+      stepEls.forEach(function(n,i){n.classList.toggle('on',i<=pos);n.classList.toggle('cur',i===pos);});
+      connEls.forEach(function(c){var ci=parseInt(c.getAttribute('data-i'),10);c.classList.toggle('on',ci<=pos);});
+      if(posEl)posEl.textContent=(pos+1);
+      var s=steps[pos]||{};
+      if(detail)detail.innerHTML='<b>'+esc2((s.id||'')+(s.layer?(' \u00b7 '+s.layer):''))+'</b> '+esc2(s.title||'')+(s.note?' \u2014 '+esc2(xrStrip(s.note)):'');
+      var cur=stepEls[pos];if(cur&&cur.scrollIntoView){try{cur.scrollIntoView({inline:'center',block:'nearest',behavior:'smooth'});}catch(e){}}
+    }
+    function stop(){if(timer){clearInterval(timer);timer=null;}if(play){play.classList.remove('on');play.innerHTML='\u25b6';}}
+    function go(d){stop();pos=Math.max(0,Math.min(steps.length-1,pos+d));render();}
+    if(prev)prev.onclick=function(){go(-1);};
+    if(next)next.onclick=function(){go(1);};
+    if(play)play.onclick=function(){
+      if(timer){stop();return;}
+      if(pos>=steps.length-1)pos=0;
+      play.classList.add('on');play.innerHTML='\u275a\u275a';render();
+      timer=setInterval(function(){if(pos>=steps.length-1){stop();return;}pos++;render();},850);
+    };
+    stepEls.forEach(function(n,i){n.onclick=function(){stop();pos=i;render();};});
+    render();
   }
 
   // ---------- REMEDIATIONS ----------
@@ -2112,6 +2366,98 @@ const REPORT = {
       ev.querySelectorAll('.ev,.trow').forEach(function(x,i){x.style.transitionDelay=(i*40)+'ms';});});
   }
 
+  // ---------- WEB GROUNDING (Foundry web_search tool) ----------
+  function buildWebSearch(seedQuery,seedRes){
+    var meta=(R&&R.meta)||{};
+    var tgt=meta.target||meta.targetName||meta.host||'the target system';
+    var sugg=[
+      'latest prompt-injection and jailbreak techniques 2026',
+      'known vulnerabilities and CVEs for '+tgt,
+      'OWASP LLM Top 10 mitigations and guardrail bypasses'
+    ];
+    document.getElementById('websearch').innerHTML=
+      topbar('Web grounding','<button class="db-btn" id="ws-back">\u2039 Back to report</button>')+
+      '<div class="rm-body"><h1 class="rm-h">Ground the report with live web intel</h1>'+
+      '<p class="rm-sub">The Coordinator\u2019s <b>web_search</b> tool queries the Foundry Responses API for real-time public-web information and returns a grounded answer plus source citations. Treat results as untrusted external input and verify the sources.</p>'+
+      '<div class="ws-bar">'+
+        '<input id="ws-q" class="ws-input" placeholder="Search the public web to enrich the findings\u2026" autocomplete="off">'+
+        '<select id="ws-ctx" class="ws-ctx" title="How much web context to pull"><option value="low">low</option><option value="medium" selected>medium</option><option value="high">high</option></select>'+
+        '<button id="ws-go" class="db-btn red">Search</button>'+
+      '</div>'+
+      '<div class="ws-chips">'+sugg.map(function(s){return '<button type="button" class="ws-chip">'+esc2(s)+'</button>';}).join('')+'</div>'+
+      '<div id="ws-out" class="ws-out"></div></div>';
+    var q=document.getElementById('ws-q');
+    function run(){
+      var out=document.getElementById('ws-out');
+      var query=(q.value||'').trim(); if(!query){q.focus();return;}
+      var ctx=(document.getElementById('ws-ctx')||{}).value||'medium';
+      out.innerHTML='<div class="ws-load"><span class="ws-spin"></span> Grounding \u201c'+esc2(query)+'\u201d against the public web\u2026</div>';
+      window.TRIDENT_API.websearch(query,ctx).then(function(res){renderWebSearch(res);}).catch(function(e){
+        var o=document.getElementById('ws-out'); if(o)o.innerHTML='<div class="ws-state err"><b>Web search failed</b><span>'+esc2(String((e&&e.message)||e))+'</span></div>';
+      });
+    }
+    document.getElementById('ws-back').onclick=function(){hide('websearch');};
+    document.getElementById('ws-go').onclick=run;
+    q.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();run();}});
+    Array.prototype.forEach.call(document.querySelectorAll('#websearch .ws-chip'),function(c){
+      c.onclick=function(){q.value=c.textContent;run();};
+    });
+    if(seedQuery){q.value=seedQuery;}
+    if(seedRes){renderWebSearch(seedRes);}
+    else if(seedQuery){run();}
+    var el=document.getElementById('websearch');
+    requestAnimationFrame(function(){el.classList.add('show');});
+    setTimeout(function(){try{q.focus();}catch(_){}} ,90);
+  }
+
+  function renderWebSearch(res){
+    var out=document.getElementById('ws-out'); if(!out)return;
+    res=res||{};
+    if(res.status==='unavailable'){
+      out.innerHTML='<div class="ws-state warn"><b>Web grounding not configured</b>'+
+        '<span>'+esc2(res.reason||'Set FOUNDRY_PROJECT_ENDPOINT to enable the Foundry web_search tool.')+'</span>'+
+        '<code>FOUNDRY_PROJECT_ENDPOINT=https://&lt;resource&gt;.ai.azure.com/api/projects/&lt;project&gt;</code></div>';
+      return;
+    }
+    if(res.status!=='ok'){
+      out.innerHTML='<div class="ws-state err"><b>Web search error</b><span>'+esc2(res.reason||res.error||'unknown error')+'</span></div>';
+      return;
+    }
+    var cz=(res.citations||[]);
+    var cites=cz.map(function(c,i){
+      var url=c.url||''; var title=(c.title||url)||'source';
+      return '<a class="ws-cite" href="'+esc2(url)+'" target="_blank" rel="noopener noreferrer">'+
+        '<span class="ws-ci">'+(i+1)+'</span><span class="ws-ct"><b>'+esc2(title)+'</b><span>'+esc2(url)+'</span></span></a>';
+    }).join('') || '<div class="rm-sub" style="margin:0">No source citations were returned for this query.</div>';
+    out.innerHTML=
+      '<div class="ws-ans"><div class="ws-ah">Grounded answer</div><div class="ws-atext">'+esc2(res.answer||'(the tool returned no answer text)')+'</div></div>'+
+      '<div class="ws-cites"><div class="ws-ch">Sources \u00b7 '+cz.length+'</div>'+cites+'</div>';
+  }
+
+  // The planning "web.search" chip \u2192 the REAL Foundry web_search tool: it updates
+  // the chip with the live source count / availability and opens the full grounding
+  // overlay (pre-filled with the fetched answer + citations) on click.
+  function openWebGrounding(query,res){buildWebSearch(query,res);show('websearch');}
+  function webSearchLive(d,query){
+    d.classList.add('ac-tool-web','loading');
+    d.title='web.search \u00b7 grounding against the public web\u2026';
+    d.innerHTML='<span class="tk">web.search</span><span class="tk-r"> \u00b7 \u2026</span>';
+    var call=(window.TRIDENT_API&&window.TRIDENT_API.websearch)?window.TRIDENT_API.websearch(query,'medium'):Promise.resolve(null);
+    call.then(function(res){webSearchLiveDone(d,query,res);},function(e){webSearchLiveDone(d,query,{status:'error',reason:String((e&&e.message)||e)});});
+  }
+  function webSearchLiveDone(d,query,res){
+    d.classList.remove('loading');
+    res=res||{status:'error'};
+    var rtxt,cls;
+    if(res.status==='ok'){var n=(res.citations||[]).length;rtxt=n+' source'+(n===1?'':'s');cls='ok';}
+    else if(res.status==='unavailable'){rtxt='not configured';cls='warn';}
+    else{rtxt='unavailable';cls='warn';}
+    d.classList.add('ac-tool-'+cls);
+    d.title='web.search \u00b7 '+query+' \u2192 '+rtxt+' (click to open)';
+    d.innerHTML='<span class="tk">web.search</span><span class="tk-r"> \u00b7 '+esc2(rtxt)+'</span>';
+    d.onclick=function(){openWebGrounding(query,res);};
+  }
+
   function show(id){var el=document.getElementById(id);el.classList.add('on');}
   function hide(id){var el=document.getElementById(id);el.classList.remove('on','show');el.querySelectorAll('[style*="transition-delay"]').forEach(function(e){e.style.transitionDelay='';});}
 
@@ -2174,11 +2520,12 @@ const REPORT = {
     // Split each package's techniques: capability-gated ones are auto-skipped on this target.
     var gate={};P.skipped.forEach(function(s){gate[s.id]=s.need;});
     function reconPlanRows(pp){
+      var arrow='<button class="pk-tx" type="button" title="Explain this attack" aria-label="Explain this attack"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>';
       var tr=pp.techniques.filter(function(id){return !gate[id];}).map(function(id){var c=CATALOG[id]||{n:id,layer:''};var ly=c.layer||'';
-        return '<div class="rc-prow"><span class="lz" style="background:'+(LC[ly]||'#888888')+'22;color:'+(LC[ly]||'#9a9aa3')+'">'+(ly||'\u2013')+'</span><b>'+esc2(c.n)+'</b><span class="mid2">'+id+(c.owasp?' \u00b7 '+c.owasp:'')+'</span></div>';
+        return '<div class="rc-pwrap"><div class="rc-prow"><span class="lz" style="background:'+(LC[ly]||'#888888')+'22;color:'+(LC[ly]||'#9a9aa3')+'">'+(ly||'\u2013')+'</span><b>'+esc2(c.n)+'</b><span class="mid2">'+id+(c.owasp?' \u00b7 '+c.owasp:'')+'</span>'+arrow+'</div><div class="pk-tx-body">'+techExplain(id,c)+'</div></div>';
       }).join('');
       var sr=pp.techniques.filter(function(id){return gate[id];}).map(function(id){var c=CATALOG[id]||{n:id};
-        return '<div class="rc-prow skip"><span class="lz" style="background:#ffffff14;color:#9a9aa3">skipped</span><b>'+esc2(c.n)+'</b><span class="mid2">'+id+' \u00b7 needs '+gate[id]+'</span></div>';}).join('');
+        return '<div class="rc-pwrap"><div class="rc-prow skip"><span class="lz" style="background:#ffffff14;color:#9a9aa3">skipped</span><b>'+esc2(c.n)+'</b><span class="mid2">'+id+' \u00b7 needs '+gate[id]+'</span>'+arrow+'</div><div class="pk-tx-body">'+techExplain(id,c)+'</div></div>';}).join('');
       return tr+sr;
     }
     function reconTagHtml(pp){
@@ -2188,11 +2535,11 @@ const REPORT = {
     }
     var pkgOptsHtml=top.map(function(item,idx){
       var p=item.pkg,best=idx===0,oc=RECON_PALETTE[idx%RECON_PALETTE.length];
-      return '<div class="rc-opt'+(best?' best':'')+'" style="--oc:'+oc.c+';--ocs:'+oc.s+';--ocm:'+oc.m+';--ocg:'+oc.g+'" data-idx="'+idx+'" data-name="'+esc2(p.name)+'">'+
+      return '<div class="rc-opt'+(best?' best':'')+'" style="--pc:'+oc.c+';--pcs:'+oc.s+';--pcm:'+oc.m+';--pcg:'+oc.g+'" data-idx="'+idx+'" data-name="'+esc2(p.name)+'">'+
         '<div class="rc-opt-head">'+
-          '<div class="rc-opt-ic">'+(best?PKGICO:String(idx+1))+'</div>'+
+          '<div class="rc-opt-ic">'+String(idx+1)+'</div>'+
           '<div class="rc-opt-main">'+
-            '<div class="rc-opt-kick">'+esc2(p.id)+' \u00b7 '+esc2(p.axis)+(best?' <span class="rc-opt-badge">BEST MATCH</span>':'')+' <span class="rc-opt-sim">'+item.sim+' match</span></div>'+
+            '<div class="rc-opt-kick">'+esc2(p.id)+' \u00b7 '+esc2(p.axis)+'</div>'+
             '<div class="rc-opt-name">'+esc2(p.name)+'</div>'+
             '<div class="rc-opt-desc">'+esc2(p.description)+'</div>'+
             '<div class="rc-opt-meta">'+reconTagHtml(p)+'</div>'+
@@ -2227,9 +2574,7 @@ const REPORT = {
       : '<div class="rc-hitl"><div class="htxt"><b>Human authorization required (HITL)</b><span>Recon does not attack. TRIDENT recommends the <b style="color:#7fe6f2" id="rc-selname">'+esc2(pkg.name)+'</b> package. Authorize to launch it against the target.</span></div>'+
         '<button class="rc-go" id="rc-go">Authorize &amp; launch attack <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>';
     var body='<div class="rc-body"><div class="rc-grid">'+
-      '<div class="panel"><div class="ph">Target identity</div><div class="rc-id">'+idrows+'</div></div>'+
-      '<div class="panel rc-caps"><div class="ph">Capabilities &amp; attack surface</div><div class="rc-capbody"><div style="margin-top:2px">'+caps+'</div>'+
-        '<div class="dsc" style="font-size:12px;color:#9a9aa3;margin-top:6px">Targetability is computed: techniques that need missing capabilities are skipped automatically.</div></div></div>'+
+      '<div class="panel" style="grid-column:1/-1"><div class="ph">Target identity</div><div class="rc-id">'+idrows+'</div></div>'+
       '<div class="panel" style="grid-column:1/-1"><div class="ph">Recon findings \u00b7 no exploits run</div>'+findings+'</div>'+
       '<div class="panel rc-pkgpanel" style="grid-column:1/-1"><div class="ph">Recommended attack packages \u00b7 top '+top.length+'</div>'+
         '<div class="rc-opts">'+pkgOptsHtml+'</div></div>'+
@@ -2243,6 +2588,10 @@ const REPORT = {
         o.onclick=function(){Array.prototype.forEach.call(opts,function(x){x.classList.remove('sel');});o.classList.add('sel');selIdx=parseInt(o.getAttribute('data-idx'),10)||0;if(selName)selName.textContent=o.getAttribute('data-name');};
         var tg=o.querySelector('[data-act="toggle"]'),det=o.querySelector('.rc-detail');
         if(tg&&det)tg.onclick=function(e){e.stopPropagation();det.classList.toggle('open');tg.textContent=det.classList.contains('open')?'Hide':'Techniques';};
+        Array.prototype.forEach.call(o.querySelectorAll('.pk-tx'),function(btn){
+          btn.onclick=function(e){e.stopPropagation();var wp=btn.closest('.rc-pwrap');if(!wp)return;
+            var bd=wp.querySelector('.pk-tx-body');var op=btn.classList.toggle('open');if(bd)bd.classList.toggle('open',op);};
+        });
       });
     })();
     document.getElementById('rc-go').onclick=function(){
@@ -2434,13 +2783,14 @@ const REPORT = {
       r.innerHTML='<div class="bubble"></div><div class="uav">'+(window.__TRIDENT_ANON||'')+'</div>';
       r.querySelector('.bubble').textContent=text;msgs.appendChild(r);down();
     }
-    function tool(box,label,query,result,cb){
+    function tool(box,label,query,result,cb,live){
       setTimeout(function(){
         var holder=box.querySelector('.ac-tools');
         if(!holder){holder=document.createElement('div');holder.className='ac-tools';box.appendChild(holder);}
         var d=document.createElement('div');d.className='ac-tool';d.title=label+' \u00b7 '+query+' \u2192 '+result;
         d.innerHTML='<span class="tk">'+esc2(label)+'</span>';
         holder.appendChild(d);down();
+        if(live&&typeof webSearchLive==='function'){webSearchLive(d,live);}
         if(cb)cb();
       },900+Math.random()*700);
     }
@@ -2458,7 +2808,7 @@ const REPORT = {
       var box=say("Understood. Let me scope this against our curated attack-package catalog.");
       var resp=null,err=false;
       planCall().then(function(r){resp=r;},function(){err=true;});
-      tool(box,'web.search',qShort+' \u00b7 latest LLM attack techniques','12 sources',function(){
+      tool(box,'web.search',qShort+' \u00b7 latest LLM attack techniques','\u2026',function(){
         tool(box,'owasp.llm_top10','map objective \u2192 risk categories','mapped',function(){
           tool(box,'mitre.atlas','align adversary tactics & techniques','aligned',function(){
             tool(box,'catalog.match','score '+PACKAGES.length+' packages by relevance','done',function(){
@@ -2470,7 +2820,7 @@ const REPORT = {
             });
           });
         });
-      });
+      },prompt);
     },550);
 
     function renderTurn(resp){
@@ -2487,7 +2837,6 @@ const REPORT = {
       if(!list.length)list=proposeLocal();
       var lead=list[0]?list[0].pkg.name:'';
       say('<span class="ac-think">Your objective maps most closely to <b>'+esc2(lead)+'</b>'+
-        (list[0]&&list[0].sim?(' (match '+esc2(String(list[0].sim))+')'):'')+
         '. Here are the <b>'+list.length+'</b> best matches \u2014 review and pick one to launch.</span>');
       revealOptions(list);
     }
@@ -2523,16 +2872,18 @@ const REPORT = {
         var tagHtml=tags.map(function(t){return '<span class="op-tag">'+esc2(t)+'</span>';}).join('');
         var techRows=p.techniques.map(function(id){var c=CATALOG[id]||{n:id,layer:''};
           var ll={prompt:'PRM',application:'APP',model:'MOD'}[c.layer]||'\u2013';
-          return '<div class="pk-tech"><span class="tl '+c.layer+'">'+ll+'</span>'+
+          return '<div class="pk-tech-wrap"><div class="pk-tech"><span class="tl '+c.layer+'">'+ll+'</span>'+
             '<span class="tn">'+esc2(c.n)+(c.owasp?' <span style="color:#76767d;font-size:11px">\u00b7 '+esc2(c.owasp)+'</span>':'')+'</span>'+
-            '<span class="tid">'+id+'</span></div>';
+            '<span class="tid">'+id+'</span>'+
+            '<button class="pk-tx" type="button" title="Explain this attack" aria-label="Explain this attack"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button></div>'+
+            '<div class="pk-tx-body">'+techExplain(id,c)+'</div></div>';
         }).join('');
         var card=document.createElement('div');card.className='ac-opt'+(best?' best':'');
         var oc=PKG_PALETTE[idx%PKG_PALETTE.length];
-        card.style.setProperty('--oc',oc.c);card.style.setProperty('--ocs',oc.s);card.style.setProperty('--ocm',oc.m);card.style.setProperty('--ocg',oc.g);
+        card.style.setProperty('--pc',oc.c);card.style.setProperty('--pcs',oc.s);card.style.setProperty('--pcm',oc.m);card.style.setProperty('--pcg',oc.g);
         card.innerHTML=
-          '<div class="op-head"><div class="op-rank">'+(best?PKGICO:String(idx+1))+'</div><div class="op-main">'+
-            '<div class="op-kick">'+esc2(p.id)+' \u00b7 '+esc2(p.axis)+(best?' <span class="op-badge">BEST MATCH</span>':'')+' <span class="op-sim">'+item.sim+' match</span></div>'+
+          '<div class="op-head"><div class="op-rank">'+String(idx+1)+'</div><div class="op-main">'+
+            '<div class="op-kick">'+esc2(p.id)+' \u00b7 '+esc2(p.axis)+'</div>'+
             '<div class="op-name">'+esc2(p.name)+'</div>'+
             '<div class="op-desc">'+esc2(item.rationale||p.description)+'</div>'+
             '<div class="op-meta">'+tagHtml+'</div></div></div>'+
@@ -2545,6 +2896,10 @@ const REPORT = {
         tg.onclick=function(){det.classList.toggle('open');
           tg.textContent=det.classList.contains('open')?'Hide':'Techniques';
           if(det.classList.contains('open')){var acts=card.querySelector('.op-acts');if(acts)setTimeout(function(){acts.scrollIntoView({block:'nearest',behavior:'smooth'});},480);}else{down();}};
+        Array.prototype.forEach.call(card.querySelectorAll('.pk-tx'),function(btn){
+          btn.onclick=function(e){e.stopPropagation();var wp=btn.closest('.pk-tech-wrap');if(!wp)return;
+            var bd=wp.querySelector('.pk-tx-body');var op=btn.classList.toggle('open');if(bd)bd.classList.toggle('open',op);};
+        });
         card.querySelector('[data-act="go"]').onclick=function(){document.body.classList.remove('pkg-open');PLAN=null;setHint(false);if(onSelect)onSelect(p);};
         card.addEventListener('click',function(){wrap.querySelectorAll('.ac-opt').forEach(function(x){x.classList.remove('sel');});card.classList.add('sel');});
         wrap.appendChild(card);
@@ -2620,6 +2975,10 @@ const REPORT = {
     plan:function(history,mode){
       return api('/api/plan',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({history:history||[],mode:mode||'attack'})});
+    },
+    websearch:function(query,ctx){
+      return api('/api/websearch',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({query:query||'',context_size:ctx||'medium'})});
     }
   };
 
@@ -2700,7 +3059,7 @@ const REPORT = {
     _q('cp-url').textContent=_connURL;
     _q('cp-engine').textContent=ok?(h.engine||'\u2014'):'\u2014';
     _q('cp-catalog').textContent=ok?((h.techniques||0)+' techniques \u00b7 '+(h.packages||0)+' packages'):'\u2014';
-    _q('cp-target').textContent=ok?((h.targets&&h.targets.join(', '))||'aigoat'):'\u2014';
+    _q('cp-target').textContent=ok?((h.targets&&h.targets.join(', '))||'echo'):'\u2014';
     _q('cp-caps').innerHTML=ok?('foundry '+_cap(h.foundry_configured)+' \u00b7 pyrit '+_cap(h.pyrit_installed)+' \u00b7 sdk '+_cap(h.sdk_installed)):'\u2014';
     _q('cp-endpoints').innerHTML=ok?['/api/health','/api/packages','/api/plan','/api/campaign'].map(function(e){return '<span class="cp-chip">'+e+'</span>';}).join(''):'\u2014';
     _q('cp-latency').textContent=(_connMs!=null)?(_connMs+' ms'):(ok?'\u2014':'unreachable');
@@ -2814,16 +3173,15 @@ const REPORT = {
   .tt-cmd .tt-run{height:36px;padding:0 18px;border-radius:8px;background:#e11d2a;color:#fff;font:700 12px/1 var(--font,sans-serif);
     text-transform:uppercase;letter-spacing:.05em}
   .tt-cmd .tt-run:disabled{opacity:.55;cursor:default}
+  .tt-prog .bubble{flex:1 1 auto;min-width:0;max-width:100%}
   .tt-prog .tp-head{display:flex;align-items:center;gap:8px;font-size:14px}
   .tt-prog .tp-head b{font-weight:600}
   .tt-prog .tp-sub{color:var(--muted,#76767d);font-size:12px;margin-left:auto;white-space:nowrap}
   .tt-prog .tp-spin{width:13px;height:13px;flex:none;border-radius:50%;border:2px solid rgba(225,29,42,.3);border-top-color:#e11d2a;animation:tt-spin .8s linear infinite}
   .tt-prog .tp-done{color:#5fc08e;font-weight:800;flex:none}
   @keyframes tt-spin{to{transform:rotate(360deg)}}
-  .tt-prog .tp-log{margin-top:9px;font:12px/1.55 ui-monospace,Consolas,monospace;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:7px 10px;max-height:150px;overflow:hidden}
-  .tt-prog .tp-line{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#c7ccd4}
-  .tt-prog .tp-line.l-dispatch{color:#5fd0e6}.tt-prog .tp-line.l-judge{color:#d98cff}.tt-prog .tp-line.l-err{color:#ff6b6b}
-  .tt-prog .tp-line.l-target{color:#e7c873}.tt-prog .tp-line.l-http{color:#7e8693}.tt-prog .tp-line.l-web{color:#6fcf8e}.tt-prog .tp-line.l-client{color:#7aa2ff}
+  .tt-prog .tp-log{margin-top:9px;font:12px/1.55 ui-monospace,Consolas,monospace;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:7px 10px;max-height:150px;overflow:hidden;max-width:100%}
+  .tt-prog .tp-line{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#aab0b8}
 </style>
 <script id="trident-term-script">
 (function(){
