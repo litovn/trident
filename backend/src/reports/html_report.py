@@ -74,12 +74,29 @@ def _coverage_section(cov: dict) -> str:
     )
 
 
+def _remediation_sources(sources: list[dict]) -> str:
+    """Render the web-search citations for a remediation item, if any."""
+    links = [
+        f'<a href="{_esc(s.get("url"))}" target="_blank" rel="noopener noreferrer">'
+        f'{_esc(s.get("title") or s.get("url"))}</a>'
+        for s in (sources or []) if s.get("url")
+    ]
+    if not links:
+        return ""
+    return ("<div class='muted' style='font-size:.85rem;margin-top:.2rem'>Sources: "
+            + " · ".join(links) + "</div>")
+
+
 def _remediation_section(rem: list[dict]) -> str:
     if not rem:
         return ""
     items = "".join(
         f"<li>{_esc(r['control'])} "
-        f"<span class='muted'>— addresses {r['addresses_findings']} finding(s)</span></li>"
+        f"<span class='muted'>— addresses {r['addresses_findings']} finding(s)</span>"
+        + (f"<div style='margin-top:.25rem'>{_esc(r['description'])}</div>"
+           if r.get("description") else "")
+        + _remediation_sources(r.get("sources", []))
+        + "</li>"
         for r in rem
     )
     return f"<h2>Recommended controls</h2><ul>{items}</ul>"
