@@ -118,7 +118,7 @@ def get_registry() -> SkillRegistry:
     return _registry
 
 
-def load_profile(target_id: str = "echo") -> TargetProfile:
+def load_profile(target_id: str = "aigoat") -> TargetProfile:
     if target_id not in _profiles:
         for path in sorted(_TARGETS_DIR.glob("*.yaml")):
             import yaml
@@ -397,7 +397,7 @@ async def _run_campaign_agentic_async(
     prompt: str,
     mode: str = "attack",
     package_id: Optional[str] = None,
-    target_id: str = "echo",
+    target_id: str = "aigoat",
 ) -> dict[str, Any]:
     """Run a real agentic campaign through the Coordinator and return the same dict
     shape as the deterministic engine. Lazy-imports the SDK/PyRIT-backed modules so
@@ -468,7 +468,7 @@ async def _run_campaign_agentic_async(
 # Public sync API (the HTTP server calls these)
 # ──────────────────────────────────────────────────────────────────────────
 def run_campaign(prompt: str, mode: str = "attack",
-                 package_id: Optional[str] = None, target_id: str = "echo") -> dict[str, Any]:
+                 package_id: Optional[str] = None, target_id: str = "aigoat") -> dict[str, Any]:
     """Synchronous entry point used by the HTTP handler (one event loop per call).
 
     Picks the engine via TRIDENT_WEB_ENGINE (auto | agentic | deterministic): the

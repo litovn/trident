@@ -2700,7 +2700,7 @@ const REPORT = {
     _q('cp-url').textContent=_connURL;
     _q('cp-engine').textContent=ok?(h.engine||'\u2014'):'\u2014';
     _q('cp-catalog').textContent=ok?((h.techniques||0)+' techniques \u00b7 '+(h.packages||0)+' packages'):'\u2014';
-    _q('cp-target').textContent=ok?((h.targets&&h.targets.join(', '))||'echo'):'\u2014';
+    _q('cp-target').textContent=ok?((h.targets&&h.targets.join(', '))||'aigoat'):'\u2014';
     _q('cp-caps').innerHTML=ok?('foundry '+_cap(h.foundry_configured)+' \u00b7 pyrit '+_cap(h.pyrit_installed)+' \u00b7 sdk '+_cap(h.sdk_installed)):'\u2014';
     _q('cp-endpoints').innerHTML=ok?['/api/health','/api/packages','/api/plan','/api/campaign'].map(function(e){return '<span class="cp-chip">'+e+'</span>';}).join(''):'\u2014';
     _q('cp-latency').textContent=(_connMs!=null)?(_connMs+' ms'):(ok?'\u2014':'unreachable');
