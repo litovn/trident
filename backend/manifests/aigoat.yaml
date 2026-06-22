@@ -1,0 +1,10 @@
+# AIGoat L0 — direct prompt injection smoke run.
+# Scope is the chosen attack package (conversational advisor, or --package);
+# pass e.g. --package PKG-GUARDRAIL, or keep the prompt specific.
+campaign_id: aigoat
+mode: attack
+target_profile_id: aigoat
+technique_denylist: []
+host_allowlist: [127.0.0.1]
+query_budget_per_vertical: 5
+hitl_techniques: []

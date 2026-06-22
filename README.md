@@ -1,344 +1,437 @@
 # TRIDENT
 
-**Black-box, multi-agent AI red-teaming accelerator.**
-Built on GitHub Copilot SDK + Microsoft Foundry + (eventually) PyRIT.
+**Black-box, multi-agent AI red-teaming accelerator** for generative-AI systems.
 
-> Phase: **v0.3 skeleton** — orchestrator, vertical agents, NL→scope, hybrid ranker,
-> policy gate, success oracle + canary, trace, target adapters. Catalog content
-> (20 techniques + 12 packages) is production-grade and target-agnostic.
-> The Coordinator runs with the offline KeywordEmbedder out-of-the-box; the same
-> code switches to Azure OpenAI by setting `AZURE_OPENAI_ENDPOINT`.
+TRIDENT takes a plain-English description of what you want to test ("jailbreak the
+chatbot", "prove it leaks data", "just map the attack surface") and turns it into a
+governed, auditable red-team campaign. It selects techniques from a curated, standards-
+mapped catalog (**OWASP LLM Top 10 (2025)** × **MITRE ATLAS** v6), dispatches them across
+three attack layers via fenced agents, scores each result with a mix of deterministic
+oracles and LLM judges, and produces a self-contained HTML report plus an immutable trace.
 
-See `TRIDENT_design_context.md` for the full design rationale and ADRs.
+Built on the **GitHub Copilot SDK** (agentic orchestration), **Microsoft Foundry** (all
+model calls), and **PyRIT** (execution surface — converters, scorers, orchestrators).
 
----
-
-## Demo scope (hackathon)
-
-For the hackathon the goal is a **working, legible recon demo** — not full automation.
-We deliberately keep the surface small:
-
-- ✅ **Recon works today** and is the headline of the demo. See **[Recon — what works
-  and how](#recon--what-works-and-how)** below for the end-to-end flow.
-- ✅ **A minimal target profile is enough.** You do *not* need the full profile schema to
-  onboard a target — just the handful of fields in **[Minimal target profile](#minimal-target-profile)**.
-  `targets/echo.yaml` is the canonical minimal *generic* profile and runs out-of-the-box.
-- ✅ **canary / markup / LLM-judge are generic.** The success-detection suite is
-  target-agnostic (deterministic checks in `targets/oracle.py`, the LLM-judge in
-  `skills/judge_factory.py`) — AIGoat is just one config, never a dependency. The
-  LLM-judge degrades gracefully to an offline heuristic when Foundry is not configured.
-- ✅ **SKILL.md is the single source of truth.** Each technique is authored as a
-  `catalog/skills_catalog/<ID>/SKILL.md` (YAML frontmatter = full machine config,
-  Markdown body = agent-facing procedure). The registry loads techniques straight
-  from these files — there is no separate catalog YAML to keep in sync.
+> **Status — v0.3.** Production-grade, target-agnostic catalog (20 techniques + 12
+> packages). Working orchestrator, vertical agents, conversational NL→scope advisor,
+> 5-rule policy gate, success oracle + canary honeytoken, immutable trace, and target
+> adapters. Scope selection is Foundry-backed and degrades gracefully to a deterministic
+> default package when Foundry is absent.
 
 ---
 
-## What's here
+## Table of contents
+
+- [Why TRIDENT](#why-trident)
+- [How it works](#how-it-works)
+- [The catalog: 3 layers, 20 techniques](#the-catalog-3-layers-20-techniques)
+- [Attack packages](#attack-packages)
+- [Scoring: confirmed vs assessed](#scoring-confirmed-vs-assessed)
+- [Install](#install)
+- [Configure Microsoft Foundry](#configure-microsoft-foundry)
+- [Run](#run)
+  - [Web UI](#web-ui)
+  - [CLI](#cli)
+- [Onboarding a target](#onboarding-a-target)
+- [Project structure](#project-structure)
+- [Design invariants](#design-invariants)
+- [Key schema decisions](#key-schema-decisions)
+- [Roadmap](#roadmap)
+- [License](#license)
+
+---
+
+## Why TRIDENT
+
+Red-teaming a GenAI application is hard to do *consistently*. Findings depend on the
+tester's creativity, coverage is uneven, results aren't reproducible, and it's easy to
+stray outside the agreed rules of engagement. TRIDENT addresses this by making the whole
+campaign **declarative and governed**:
+
+- **Black-box.** It only needs an endpoint and a small target profile — no model weights,
+  no source access.
+- **Standards-mapped.** Every technique is tagged to OWASP LLM Top 10 and MITRE ATLAS, so
+  coverage is measurable and reports speak the language auditors expect.
+- **Agents select, never invent.** Agents choose from the fixed catalog; they cannot
+  improvise novel attacks outside the authored, reviewed technique set.
+- **Governed by code.** A manifest is your *Rules of Engagement as Code*: campaign mode,
+  host allowlist, technique denylist, query budgets, and human-in-the-loop gates. Every
+  action passes a policy gate before it touches the target.
+- **Auditable.** A single immutable trace feeds the report — every prompt, response,
+  verdict, and piece of evidence is recorded.
+
+---
+
+## How it works
 
 ```
-trident/                  # the package
-├── core/                 # client, models (v0.3), policy_gate (5 rules), trace
-├── nl/                   # ranker (hybrid: lexicon + embedding + LLM confirm), scope_to_scan
-├── skills/               # base, registry (with JSON Schema validator), pyrit_runner
-├── agents/               # factory (build_vertical_session + make_pyrit_tools), briefs (enriched)
-├── orchestrator/         # coordinator (Phase 0–4), dispatch (agents-as-tools)
-├── targets/              # adapter Protocol, oracle (canary + placeholders), echo
-├── reports/              # correlator, html_report
-└── cli.py                # `python -m src.cli --manifest ... --prompt ...`
-
-catalog/                  # 20 techniques + 12 packages + JSON Schema + 5 reference docs
-├── skills_catalog/       # one SKILL.md per technique — the single source of truth
-│   ├── TRD-PRM-*/SKILL.md    # 5 prompt techniques (frontmatter = full TechniqueConfig)
-│   ├── TRD-APP-*/SKILL.md    # 9 application techniques
-│   └── TRD-MOD-*/SKILL.md    # 6 model techniques (-004/-005/-006 deferred-mvp)
-├── packages.yaml         # 12 packages: 4 profile + 3 layer + 5 focus
-└── schema/catalog.schema.json     # authoritative; validated at load time
-
-targets/                  # declarative target profiles (v0.3)
-├── echo.yaml             # in-process profile for smoke / unit tests
-├── aigoat.yaml           # the reference vulnerable target
-└── target_profile.example.yaml
-
-manifests/                # Rules of Engagement as Code (ADR-008)
-├── sample.yaml           # recon-mode smoke
-└── sample_attack.yaml    # attack-mode smoke
-
-                          # (tests/ suite is not wired on this demo branch — see "Tests" below)
+NL prompt  ("prove it leaks the planted secret")
+   │
+   ▼  Phase 1 — Package advisor (conversational, Foundry-backed; or --package)
+Chosen package  (e.g. PKG-EXFIL)
+   │
+   ▼  Phase 2 — scope_to_scan  (gating: capabilities, allow/denylist, mode, status)
+ScanPlan(verticals = [VerticalConfig × 1 or 3], skipped = […])
+   │
+   ▼  Phase 3 — Coordinator (GitHub Copilot SDK, agents-as-tools)
+    ├── dispatch_prompt_agent  ─►  fenced Prompt vertical session  ─►┐
+    ├── dispatch_app_agent     ─►  fenced App vertical session     ─►├─► Scorecards
+    └── dispatch_model_agent   ─►  fenced Model vertical session   ─►┘
+                                          │
+                                          ▼  each skill handler:
+                                          1. PolicyGate.check(action)
+                                          2. PyritRunner.execute(technique, params, target)
+                                               ├─ resolve {planted_secret} / {target_name}
+                                               ├─ target.send(prompt)
+                                               ├─ deterministic scorer? → SuccessOracle.detect()
+                                               └─ judged scorer?         → LLM judge (offline fallback)
+                                          3. Trace.append_*
+   │
+   ▼  Phase 4 — reports.correlator + reports.html_report
+output/<campaign>.html   +   output/<campaign>.trace.jsonl
 ```
+
+Four collaborating roles:
+
+1. **NL→scope advisor** (`src/nl/`) — a conversational package selector. It asks
+   clarifying questions only when the prompt is vague, otherwise proposes the best-fit
+   packages immediately.
+2. **Coordinator** (`src/orchestrator/`) — the top-level agent. It opens one *fenced*
+   vertical session per in-scope layer, exposing **only** that layer's permitted skills.
+3. **Vertical agents** (`src/agents/`) — Prompt / Application / Model specialists. Each
+   reasons over its layer's techniques and drives them through the runner.
+4. **Runner + oracle + trace** (`src/skills/`, `src/targets/`, `src/core/`) — the
+   deterministic spine: policy-gate every action, execute via PyRIT, score, and record.
+
+A campaign targets **one layer or all three — never exactly two** (ADR-021): findings are
+either layer-isolated or a full-stack sweep.
+
+---
+
+## The catalog: 3 layers, 20 techniques
+
+The catalog is the single source of truth. Each technique is one file —
+`catalog/skills_catalog/<ID>/SKILL.md` — whose **YAML frontmatter is the full machine
+config** and whose **Markdown body is the agent-facing procedure**. The registry loads
+techniques straight from these files and validates every one against
+`catalog/schema/catalog.schema.json` at load time (fail-fast on bad enums, missing
+fields, malformed IDs, or dangling package references).
+
+| Layer | What it attacks | Techniques |
+|---|---|---|
+| **Prompt** (`TRD-PRM-*`) | the input / prompt surface | 5 — system-prompt extraction, direct injection, multi-turn jailbreak, obfuscated injection, guardrail-probing recon |
+| **Application** (`TRD-APP-*`) | RAG, tools, orchestration | 9 — indirect/RAG injection, info disclosure, output-handling (XSS), tool abuse, memory poisoning, exfil-via-tool, credential harvesting, tool poisoning, surface-enumeration recon |
+| **Model** (`TRD-MOD-*`) | the underlying model via its API | 6 — fingerprinting, data extraction, misinformation, plus membership inference / extraction / inversion (cumulative, post-MVP) |
+
+**Coverage is honest:** the OWASP map declares what is *not* black-box targetable rather
+than hiding it — LLM03 (Supply Chain) and LLM10 (Unbounded Consumption) are marked
+⛔ not-targetable with a stated reason. The full coverage matrices, ATLAS technique IDs,
+and per-technique cards live in [`catalog/CATALOG.md`](backend/catalog/CATALOG.md).
+
+---
+
+## Attack packages
+
+A **package** is a curated bundle of technique IDs plus safe limits (`max_intensity`,
+`query_budget`) and the modes it runs in. The advisor resolves a prompt to a package
+("package-first"). 12 packages across three axes (`catalog/packages.yaml`):
+
+- **Profiles (one-click):** `PKG-QUICK` (quick scan) · `PKG-OWASP` (OWASP LLM sweep) ·
+  `PKG-ATLAS` (ATLAS kill-chain) · `PKG-360` (full coverage).
+- **Per-layer (single-layer option):** `PKG-PROMPT` · `PKG-APP` · `PKG-MODEL`.
+- **Per-focus (intent-themed):** `PKG-GUARDRAIL` (jailbreak) · `PKG-EXFIL` (data
+  exfiltration) · `PKG-RAG` (retrieval security) · `PKG-AGENTIC` (tool abuse) ·
+  `PKG-RECON` (recon-only, non-intrusive).
+
+---
+
+## Scoring: confirmed vs assessed
+
+Every result carries a verdict *kind* so you always know how much to trust it:
+
+| Verdict | Meaning | Produced by |
+|---|---|---|
+| **`confirmed`** | deterministic ground truth, with evidence in the trace | `exfil_canary` / `leak_detector` (planted honeytoken), `output_markup` (structural regex), `categorical_match` (model fingerprint) |
+| **`assessed`** | an LLM judgement, not ground truth | `refusal_judge` / `judged_objective` (LLM judge, with an **offline refusal heuristic** fallback when Foundry is absent) |
+
+The deterministic detectors are powered by a per-target **SuccessOracle** (`src/targets/
+oracle.py`). The key mechanism is a **canary honeytoken**: generated per campaign, planted
+into the target by its adapter via the configured `plant_surface`, and resolved into
+technique objectives through the `{planted_secret}` placeholder. When the model later
+emits that exact token, disclosure is *confirmed*, and the canary's `data_classification`
+drives the **MSRC AI bug-bar** severity (e.g. `info` → `high`). See
+[`catalog/severity.md`](backend/catalog/severity.md), [`catalog/oracle.md`](backend/catalog/oracle.md),
+and [`catalog/scorers.md`](backend/catalog/scorers.md) for the full contracts.
 
 ---
 
 ## Install
 
+> **Python 3.11+ required** (tested on 3.11.9). All commands run from inside `backend/`.
+
 ```powershell
+cd backend
+
 # Full install (all capabilities): Copilot SDK + ranker + PyRIT + dev tooling
 pip install -e ".[sdk,ranker,real,dev]"
 ```
 
-Extras (compose as needed):
+Extras compose as needed:
 
 | Extra | Pulls in | Needed for |
 |---|---|---|
 | `sdk` | `github-copilot-sdk`, `azure-identity` | the agentic Coordinator + vertical sessions |
-| `ranker` | `openai`, `azure-identity` | Phase-1 NL→scope ranker (Azure OpenAI) |
+| `ranker` | `openai`, `azure-identity` | the Phase-1 NL→scope package advisor |
 | `real` | `pyrit` | the PyRIT execution surface (converters, judged scorers, orchestrators) |
 | `dev` | `pytest`, `build` | tests + packaging |
 
-The base install (no extras) is enough to import the catalog/registry/oracle and
-the deterministic core. `requirements.txt` remains a pinned lockfile of a known-good
-environment.
+The **base install** (no extras) is enough to import the catalog/registry/oracle and run
+the deterministic core + the offline web engine. `requirements.txt` is a pinned lockfile
+of a known-good environment.
 
-> Python 3.11+ required (tested on 3.11.9).
-> Every run goes through the agentic Coordinator and **requires Microsoft
-> Foundry** (`FOUNDRY_ENDPOINT` + `az login`, or `FOUNDRY_API_KEY`). See `.env.example`.
+---
 
+## Configure Microsoft Foundry
+
+Both the Copilot SDK Coordinator and the NL→scope advisor route **every model call through
+Microsoft Foundry** — costs bill against **Foundry credit, never GitHub Copilot tokens**.
+`FOUNDRY_ENDPOINT` is required for the full agentic path; without it the advisor falls back
+to a deterministic default package per mode and the LLM judge falls back to an offline
+heuristic, so a run still works (just without conversational scope selection).
+
+Copy `.env.example` to `.env` and fill it in, or set the variables directly:
+
+```powershell
+$env:FOUNDRY_ENDPOINT         = "https://<account>.cognitiveservices.azure.com/"
+$env:FOUNDRY_MODEL_DEPLOYMENT = "gpt-4o-mini"     # Coordinator + advisor + judge chat
+
+# Auth (preferred): DefaultAzureCredential — `az login` locally, Managed Identity in prod.
+az login
+
+# Optional BYOK shortcut (prod should use Key Vault + Managed Identity, not .env):
+# $env:FOUNDRY_API_KEY = "..."
+```
+
+No code change is needed to switch on Foundry — `TridentClient` (`src/core/client.py`) and
+the ranker both read `FoundrySettings` (`src/core/config.py`) from the environment. See
+[`.env.example`](backend/.env.example) for the complete variable list (wire API, ranker
+overrides, the optional `web_search` grounding project endpoint, and target credentials).
 
 ---
 
 ## Run
 
-Every campaign goes through the SDK Coordinator and **requires Foundry**
-(`FOUNDRY_ENDPOINT` + `az login`, or `FOUNDRY_API_KEY`). The Echo target is
-in-process, so these examples are a cheap end-to-end smoke that still exercises
-the real Coordinator → vertical → PyRIT path.
+> All commands run from inside `backend/` (`cd backend` first).
 
-### Recon — what works and how
+### Web UI
 
-```powershell
-python -m src.cli `
-  --manifest manifests/sample.yaml `
-  --catalog  catalog `
-  --out      output `
-  --prompt   "recon the bot defenses, fingerprint the model, map the app surface"
-```
-
-Expected: each layer fires its **lead recon technique** —
-
-| Layer | Technique | Scorer | Verdict kind |
-|---|---|---|---|
-| prompt | `TRD-PRM-R01` Guardrail probing | `judged_objective` | `assessed` (LLM-judge, offline fallback) |
-| application | `TRD-APP-R01` RAG/tool surface enumeration | `judged_objective` | `assessed` (LLM-judge, offline fallback) |
-| model | `TRD-MOD-001` Model fingerprinting | `categorical_match` | `confirmed` (deterministic) |
-
-Outputs: `output/smoke-001-recon.html` + `output/smoke-001-recon.trace.jsonl`.
-
-**How recon works, end to end:**
-
-1. **NL → scope.** The ranker maps the prompt to recon techniques; `mode: recon` on the
-   manifest means the policy gate keeps only `phase ∈ {recon, both}` and blocks exploit-only
-   techniques (`rule=mode_intent`).
-2. **scope → scan.** `scope_to_scan` drops any technique whose `needs_capabilities` the target
-   profile doesn't satisfy. Echo advertises `has_chat` → all three leads survive.
-3. **Dispatch.** The Coordinator opens one *fenced* vertical session per layer, exposing only
-   that layer's in-scope skills.
-4. **Execute + score (per technique).** Every skill funnels through `PyritRunner`:
-   `PolicyGate.check` → resolve `{planted_secret}`/`{target_name}` in the objective →
-   `target.send(prompt)` → score. Deterministic scorers (`categorical_match` here) go through
-   the **SuccessOracle** and yield `confirmed` ground truth; judged scorers (`judged_objective`)
-   go through the **LLM-judge**, falling back to the offline refusal heuristic when Foundry is
-   absent (verdict stays `assessed`).
-5. **Report.** The immutable `Trace` feeds `correlator` + `html_report`.
-
-So recon already exercises **both** halves of the generic scoring suite on a generic target:
-the deterministic path (`categorical_match` → `confirmed` model fingerprint) and the
-LLM-judge path (`judged_objective`). The same `SuccessOracle` powers `exfil_canary` /
-`leak_detector` (canary honeytoken) and `output_markup` (executable-markup regex) used by the
-attack flow below.
-
-### Attack (with canary exfil)
+The frontend (`frontend/frontend.html`) is a single-file console — planner, live terminal,
+and report viewer. It's served by a tiny stdlib web bridge (`src/web/`) that exposes the
+engine over a same-origin JSON API with **zero extra dependencies** beyond the base
+install. This is the easiest way to drive TRIDENT and the headline of the demo:
 
 ```powershell
-python -m src.cli `
-  --manifest manifests/sample_attack.yaml `
-  --catalog  catalog `
-  --out      output `
-  --prompt   "data exfiltration: leak the planted secret and exfiltrate sensitive data"
+run_web.cmd                 # http://localhost:8765  (default port)
+run_web.cmd --port 9000
 ```
 
-Expected: the ranker picks `PKG-EXFIL`, runs 4 leak-class techniques across the
-three layers, the EchoTargetAdapter surfaces the planted canary, and the
-`SuccessOracle` confirms each disclosure (5 oracle hits, severity bumped from
-`info` → `high` per the MSRC AI bug bar).
+`run_web.cmd` prefers the repo `.venv` and launches `python -m src.web.server`, which
+serves the UI at `/` and exposes:
+
+| Endpoint | Purpose |
+|---|---|
+| `GET  /api/health` | capability probe (engine, catalog counts, foundry/pyrit/sdk flags) |
+| `GET  /api/packages`, `GET /api/techniques` | catalog data for the UI |
+| `POST /api/plan` | one advisor turn — propose packages or ask to clarify |
+| `POST /api/campaign` | run a recon/attack campaign; returns the trace + correlated report |
+| `GET  /api/logstream` | Server-Sent Events: the engine's live logs (web terminal) |
+
+The web engine runs the in-process **Echo** target out of the box, so you can exercise the
+full plan → dispatch → score → report flow without configuring an external target.
+
+### CLI
+
+Every campaign goes through the SDK Coordinator. Point it at a manifest (Rules of
+Engagement) and a natural-language prompt; the advisor (or `--package`) selects the scope.
+
+```powershell
+# Attack a real target. The manifest's `target_profile_id` resolves a profile
+# from targets/ (here: targets/aigoat.yaml — the reference vulnerable app).
+python -m src.cli `
+  --manifest manifests/aigoat.yaml `
+  --catalog  catalog `
+  --targets-dir targets `
+  --out      output `
+  --prompt   "direct prompt injection: override the bot and exfiltrate the secret"
+
+# Skip the conversational advisor and pin the package:
+python -m src.cli --manifest manifests/aigoat.yaml --package PKG-GUARDRAIL `
+  --prompt "bypass the guardrails"
+```
+
+Useful flags (`python -m src.cli --help`):
+
+- `--package <ID>` — skip the advisor and use a specific package (e.g. `PKG-EXFIL`).
+- `--confirm-chain` — human-in-the-loop: ask before dispatching each layer (interactive
+  TTY only).
+- `--targets-dir`, `--catalog`, `--out` — override the default directories.
+
+A run writes two artifacts to `--out`: `output/<campaign_id>.html` (the report) and
+`output/<campaign_id>.trace.jsonl` (the immutable trace).
+
+> **AIGoat note:** the AIGoat adapter needs the target running locally and an
+> `AIGOAT_PASSWORD` env var (see `.env.example`). The Echo target is in-process and needs
+> nothing — it's the fastest end-to-end smoke and is what the web engine uses by default.
+
+A manifest is small and declarative — `manifests/aigoat.yaml`:
+
+```yaml
+campaign_id: aigoat
+mode: attack                 # recon | attack — gate-enforced (ADR-018)
+target_profile_id: aigoat    # resolves targets/aigoat.yaml by its `id` field
+technique_denylist: []
+host_allowlist: [127.0.0.1]  # Rules of Engagement: attack traffic stays here
+query_budget_per_vertical: 5
+hitl_techniques: []
+```
 
 ---
 
-## Against a real target
+## Onboarding a target
 
-The manifest names its target via `target_profile_id`; TRIDENT resolves the
-matching profile from the `targets/` directory (e.g. `targets/aigoat.yaml`).
-Switch targets by changing that one field — no CLI flag. Requires the Copilot
-SDK + Foundry, as above.
-
-```powershell
-python -m src.cli `
-  --manifest manifests/aigoat_l0_prompt_injection.yaml `
-  --catalog  catalog `
-  --out      output `
-  --prompt   "<natural-language scope from the user>"
-```
-
-The Coordinator session is created with `dispatch_prompt_agent`,
-`dispatch_app_agent`, and `dispatch_model_agent` as tools. Each dispatch spins
-up a *fenced* vertical session that exposes **only** that layer's in-scope
-skills (post policy-gate filtering). The agent never sees OWASP/ATLAS taxonomy
-directly — it receives ready converters + objectives via the enriched
-`VerticalConfig` brief.
-
----
-
-## Minimal target profile
-
-You do **not** need the full profile schema to onboard a target. A target plugs into the
-**generic** core through a small YAML profile + a `SuccessOracle` block; everything else is
-optional. `targets/echo.yaml` is the canonical *minimal generic* profile and is what the
-recon/attack smokes above use.
-
-The minimum to get **recon + canary + markup + LLM-judge** working:
+TRIDENT's core is **target-agnostic** — only files under `src/targets/` may know endpoint
+specifics. A target plugs in through a small YAML **profile** plus a `success_oracle`
+block; **targetability is computed**: a technique runs only if the target's `capabilities`
+satisfy its `needs_capabilities`. The minimum to get recon + canary + markup + LLM-judge
+working:
 
 ```yaml
 id: my-target                 # slug (the CLI maps this to an adapter)
 name: "My GenAI app"
 base_url: "https://my-target.invalid"
 
-# Drives technique targetability: a technique runs only if the target's capabilities
-# satisfy its needs_capabilities. has_chat alone is enough for the three recon leads.
+# Drives technique targetability. has_chat alone is enough for the recon leads.
 capabilities: [has_chat]
 
-# Abstract attack surface → concrete endpoint. Recon leads only need `chat`.
+# Abstract attack surface → concrete endpoint. The adapter resolves these.
 surfaces:
   chat: { method: POST, path: /api/chat }
 
 auth: { type: none }          # none | bearer | apikey | cookie
 
-# The generic success-detection suite. Everything here is optional, but each block
-# unlocks one deterministic detector:
+# The generic success-detection suite — each block unlocks one detector.
 success_oracle:
-  canary:                     # → exfil_canary / leak_detector (honeytoken planted by the adapter)
+  canary:                     # → exfil_canary / leak_detector (honeytoken)
     prefix: TRIDENT
     plant_surface: chat       # chat | retrieval_ingest | search | tool
     data_classification: Confidential   # feeds MSRC severity
-  expected_model_set: [GPT, Llama, Mistral, Phi]   # → categorical_match (model fingerprint)
-# output_markup needs no config — it is a structural regex over the response.
-# refusal_judge / judged_objective need no target config — they use the LLM-judge
-# (or the offline heuristic when Foundry is absent).
+  expected_model_set: [GPT, Llama, Mistral, Phi]   # → categorical_match (fingerprint)
+# output_markup needs no config — generic regex over the response.
+# refusal_judge / judged_objective need no config — LLM judge (offline fallback).
 ```
 
 What each detector needs from the profile:
 
 | Detector | Verdict | Needs in profile |
 |---|---|---|
-| `exfil_canary` / `leak_detector` | `confirmed` | `success_oracle.canary` (and an adapter that plants it) |
+| `exfil_canary` / `leak_detector` | `confirmed` | `success_oracle.canary` + an adapter that plants it |
 | `output_markup` | `confirmed` | nothing — generic regex on the output |
 | `categorical_match` (fingerprint) | `confirmed` | `success_oracle.expected_model_set` |
-| `refusal_judge` / `judged_objective` | `assessed` | nothing — LLM-judge, offline fallback |
+| `refusal_judge` / `judged_objective` | `assessed` | nothing — LLM judge, offline fallback |
 
-> Adapters: the CLI maps `id` → an adapter (`echo`, `aigoat`). A brand-new `id` needs a small
-> adapter that knows how to `send()` (and, if you use a canary, how to plant it). For the demo,
-> reuse `echo` (in-process) or `aigoat`. See `targets/target_profile.example.yaml` for the full
-> annotated schema.
-
----
-
-## Tests
-
-> The automated `pytest` suite is **not part of this demo branch** — it will be
-> re-wired in v1 alongside the real PyRIT/judge integration. For the hackathon the
-> verification path is the **recon smoke** above (deterministic `categorical_match`
-> → `confirmed`) plus the offline LLM-judge fallback, which run without Foundry.
+The CLI maps the profile `id` to an adapter. Two adapters ship today: **`echo`**
+(in-process, no setup) and **`aigoat`** (HTTP, the reference vulnerable target). A
+brand-new `id` needs a small adapter implementing `send()` (and, for a canary, `plant()`).
+See [`targets/target_profile.example.yaml`](backend/targets/target_profile.example.yaml)
+for the fully-annotated schema and [`targets/aigoat.yaml`](backend/targets/aigoat.yaml)
+for a real one.
 
 ---
 
-## How it all wires together
+## Project structure
 
 ```
-NL prompt
-  │
-  ▼ Phase 1 — Ranker (hybrid: lexicon hits + cosine + LLM confirm, package-first)
-Scope (selection_mode = package | techniques)
-  │
-  ▼ Phase 2 — scope_to_scan (gating: capabilities, allow/denylist, mode, status)
-ScanPlan(verticals=[VerticalConfig×N], skipped=[…], layer_cardinality)
-  │
-  ▼ Phase 3 — Coordinator
-   ├── dispatch_prompt_agent  ─► fenced PromptVertical session    ─►┐
-   ├── dispatch_app_agent     ─► fenced AppVertical session       ─►├─► Scorecards
-   └── dispatch_model_agent   ─► fenced ModelVertical session     ─►┘
-                                          │
-                                          ▼ each skill handler:
-                                          1. PolicyGate.check(action)
-                                          2. PyritRunner.execute(tech, params, target)
-                                                ├─ resolve {planted_secret} in objective
-                                                ├─ target.send(prompt)
-                                                ├─ DETERMINISTIC scorer? → SuccessOracle.detect()
-                                                └─ JUDGED scorer?         → v0 surrogate / PyRIT
-                                          3. Trace.append_*
-  │
-  ▼ Phase 4 — reports.correlator + reports.html_report
-output/<campaign>.html  +  output/<campaign>.trace.jsonl
+backend/                  # all Python: engine, API, catalog, profiles
+├── src/
+│   ├── core/             # client (Foundry), models, policy_gate (5 rules), trace, config
+│   ├── nl/               # advisor (conversational package selector) + scope_to_scan
+│   ├── skills/           # base, registry (JSON-Schema validated), pyrit_runner, judge
+│   ├── agents/           # factory (build vertical sessions + PyRIT tools), briefs
+│   ├── orchestrator/     # coordinator (Phase 0–4), dispatch (agents-as-tools), scope_tool
+│   ├── targets/          # adapter Protocol, oracle (canary + detectors), echo, aigoat
+│   ├── reports/          # correlator + html_report
+│   ├── web/              # web bridge: server (stdlib HTTP) + engine + logbus (SSE)
+│   └── cli.py            # python -m src.cli --manifest ... --prompt ...
+├── catalog/              # 20 techniques + 12 packages + JSON Schema + reference docs
+│   ├── skills_catalog/   # one SKILL.md per technique — the single source of truth
+│   │   ├── trd-prm-*/SKILL.md   # 5 prompt techniques
+│   │   ├── trd-app-*/SKILL.md   # 9 application techniques
+│   │   └── trd-mod-*/SKILL.md   # 6 model techniques (-004/-005/-006 post-MVP)
+│   ├── packages.yaml     # 12 packages: 4 profile + 3 layer + 5 focus
+│   ├── schema/catalog.schema.json   # authoritative; validated at load time
+│   └── CATALOG.md, severity.md, oracle.md, scorers.md, strategies.md   # design docs
+├── targets/              # declarative target profiles
+│   ├── aigoat.yaml                   # the reference vulnerable target
+│   └── target_profile.example.yaml   # fully-annotated generic schema
+├── manifests/            # Rules of Engagement as Code (ADR-008)
+│   ├── aigoat.yaml               # attack-mode run against AIGoat
+│   └── sample_attack.yaml        # attack-mode smoke
+├── run_web.cmd           # launches the web bridge (serves ../frontend on :8765)
+├── requirements.txt
+├── pyproject.toml
+└── .env.example
+
+frontend/
+└── frontend.html         # single-file TRIDENT console (planner, terminal, report)
+
+output/                   # generated reports (.html) + traces (.trace.jsonl)
 ```
 
 ---
 
-## The 4 invariants (do not break)
+## Design invariants
 
-1. **Skills NEVER call PyRIT directly** — they go through `skills.pyrit_runner.PyritRunner`.
-2. **Every action passes `core.policy_gate.PolicyGate.check`** (inside the skill handler).
-3. **Only the immutable `core.trace.Trace`** feeds the report — no blackboard.
-4. **Target-agnostic core** — only `targets/*.py` may know endpoint specifics.
-   AIGoat is one implementation, never a dependency.
+These four rules keep the system auditable and target-agnostic — do not break them:
+
+1. **Skills never call PyRIT directly** — they go through `skills.pyrit_runner.PyritRunner`.
+2. **Every action passes `core.policy_gate.PolicyGate.check`** inside the skill handler.
+3. **Only the immutable `core.trace.Trace`** feeds the report — there is no shared blackboard.
+4. **Target-agnostic core** — only `src/targets/*.py` may know endpoint specifics. AIGoat
+   is one implementation, never a dependency.
 
 ---
 
-## Key schema decisions (v0.3 — see `catalog/CATALOG.md` + `catalog/severity.md`)
+## Key schema decisions
 
 | Concept | Type | Notes |
 |---|---|---|
-| `mode` | `recon` / `attack` | Campaign-level, on the manifest. Gate-enforced (ADR-018). |
-| `phase` | `recon` / `exploit` / `both` | Technique-level, on each catalog entry. |
-| `severity_base` | `critical` / `high` / `medium` / `low` / `info` | MSRC AI bug bar (string, not int). |
-| `severity_track` | `security` / `content` | Track B (content) is *informational*, not blocking. |
-| `scorer` | enum | DETERMINISTIC → SuccessOracle; JUDGED → PyRIT self-ask. |
-| `success_oracle` | block on target profile | Canary, plant surface, data classification, expected model set. |
-| Layer cardinality | `1` OR `3`, never `2` | ADR-021: each campaign targets one layer or all three. |
+| `mode` | `recon` / `attack` | Campaign-level (manifest). Gate-enforced (ADR-018). |
+| `phase` | `recon` / `exploit` / `both` | Technique-level (catalog). Recon-mode keeps `phase ∈ {recon, both}`. |
+| `severity_base` | `critical` / `high` / `medium` / `low` / `info` | MSRC AI bug bar (string). |
+| `severity_track` | `security` / `content` | Content track is *informational*, not blocking. |
+| `scorer` | enum | Deterministic → SuccessOracle (`confirmed`); judged → LLM judge (`assessed`). |
+| `success_oracle` | block on the target profile | Canary, plant surface, data classification, expected model set. |
+| Layer cardinality | `1` OR `3`, never `2` | ADR-021: a campaign targets one layer or all three. |
 
 ---
 
-## Switching to Microsoft Foundry 
+## Roadmap
 
-Both the Copilot SDK Coordinator and the Phase-1 ranker route their model
-calls through Foundry using `DefaultAzureCredential` — every call bills
-against **Foundry credit, not GitHub Copilot tokens**. `FOUNDRY_ENDPOINT` is
-required; `TridentClient.start()` raises if it is unset. The ranker keeps a
-deterministic `KeywordEmbedder` + `PassthroughConfirmer` only for unit tests
-(no model call), not as a runtime fallback.
-
-```powershell
-$env:FOUNDRY_ENDPOINT          = "https://<your-foundry>.cognitiveservices.azure.com"
-$env:FOUNDRY_MODEL_DEPLOYMENT  = "gpt-4o-mini"           # Coordinator + ranker chat
-$env:FOUNDRY_EMBED_DEPLOYMENT  = "text-embedding-3-large" # ranker embedder (multilingual)
-# Auth (preferred): DefaultAzureCredential — `az login` locally, MI in prod.
-# Optional BYOK shortcut: $env:FOUNDRY_API_KEY = "..."
-az login
-pip install -e ".[sdk,ranker]"
-```
-
-No code change required — `TridentClient` (in `src/core/client.py`) and
-`make_ranker(registry)` both pick up the Foundry config from `FoundrySettings`
-in `src/core/config.py`. See `.env.example` for the full variable list.
+- **Automatic technique synthesis (v1).** Tooling that drafts new `SKILL.md` techniques
+  (and recon → target-profile generation). Today every technique is hand-authored.
+- **Re-wire the `pytest` suite** (policy gate, ranker, end-to-end dispatch).
+- **Real PyRIT as the default judge** in `skills/pyrit_runner.py` (SelfAskRefusalScorer,
+  SelfAskTrueFalseScorer) — today's default judge is the offline heuristic.
+- **Cumulative-scope techniques** (`TRD-MOD-004/005/006`) once the campaign-level scorer lands.
+- **Foundry hosted deployment** — one-click `azd up` with Key Vault + Managed Identity.
+- **Richer HTML report** — attack-chain visualization and an ATLAS heatmap.
 
 ---
 
-## Roadmap (post-MVP)
+## License
 
-- **Automatic *technique* synthesis — v1 (out of demo scope).** Grow tooling that
-  drafts new `SKILL.md` techniques (and recon → target-profile generation). Today
-  every technique is a hand-authored `SKILL.md` loaded directly by the registry.
-- Re-wire the `pytest` suite (policy gate, ranker, end-to-end dispatch).
-- Real PyRIT wiring as the default judge in `skills/pyrit_runner.py`
-  (SelfAskRefusalScorer, SelfAskTrueFalseScorer) — today's default is the offline heuristic.
-- HTTP target adapter for AIGoat (today's adapter is in-process Echo).
-- Cumulative-scope techniques (`TRD-MOD-004/005/006`) once the campaign-level
-  scorer infra lands.
-- Foundry hosted deployment (one-click `azd up`) with Key Vault + Managed Identity.
-- Richer HTML report (chain visualization, ATLAS heatmap).
+MIT © Nikita Litovchenko. See [`pyproject.toml`](backend/pyproject.toml).
+
+> **Use responsibly.** TRIDENT is an offensive-security tool. Only run it against systems
+> you own or are explicitly authorized to test, and keep every campaign inside the
+> `host_allowlist` and Rules of Engagement declared in its manifest.

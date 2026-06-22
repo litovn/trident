@@ -1,0 +1,78 @@
+import os
+from dataclasses import dataclass
+from functools import lru_cache
+
+
+def _env(key: str, default: str = "") -> str:
+    return os.environ.get(key, default).strip()
+
+
+@dataclass(frozen=True)
+class FoundrySettings:
+    # ── Microsoft Foundry (control plane + model endpoint) ──────────────
+    endpoint: str = ""
+    model_deployment: str = "gpt-4o-mini"
+    api_key: str = ""              # BYOK shortcut (prod uses Managed Identity via az login)
+    api_version: str = "2024-10-21"
+    wire_api: str = "chat_completions"   # Copilot SDK wire_api: chat_completions | responses | completions
+
+    # ── Ranker-only overrides (Phase 1 NL→scope) ───────────────────
+    embed_deployment: str = "text-embedding-3-large"
+    chat_deployment: str = ""      # empty → falls back to model_deployment
+
+    # ── Foundry Agent Service project (web_search grounding tool) ───────
+    # The web_search tool runs server-side in the Foundry Responses API, which
+    # is exposed on the *project* endpoint, e.g.
+    #   https://<resource>.ai.azure.com/api/projects/<project>
+    # This is distinct from `endpoint` (the bare account / model URL the
+    # Copilot SDK + ranker use). Optional: the web_search tool degrades to an
+    # "unavailable" no-op when this is unset, leaving every other flow untouched.
+    project_endpoint: str = ""
+
+    @classmethod
+    def from_env(cls) -> "FoundrySettings":
+        return cls(
+            endpoint=_env("FOUNDRY_ENDPOINT"),
+            model_deployment=_env("FOUNDRY_MODEL_DEPLOYMENT", "gpt-4o-mini"),
+            api_key=_env("FOUNDRY_API_KEY"),
+            api_version=_env("FOUNDRY_API_VERSION", "2024-10-21"),
+            wire_api=_env("FOUNDRY_WIRE_API", "chat_completions"),
+            embed_deployment=_env("FOUNDRY_EMBED_DEPLOYMENT", "text-embedding-3-large"),
+            chat_deployment=_env("FOUNDRY_CHAT_DEPLOYMENT"),
+            project_endpoint=_env("FOUNDRY_PROJECT_ENDPOINT"),
+        )
+
+    def require_endpoint(self) -> None:
+        """Fail loudly when FOUNDRY_ENDPOINT is missing."""
+        if not self.endpoint:
+            raise RuntimeError(
+                "FOUNDRY_ENDPOINT is required. Set it to your Foundry account URL, "
+                "e.g. https://<account>.services.azure.com — see .env.example."
+            )
+
+    @property
+    def effective_chat_deployment(self) -> str:
+        """Chat deployment for the ranker: explicit override or the agent's model."""
+        return self.chat_deployment or self.model_deployment
+
+    @property
+    def responses_url(self) -> str:
+        """Foundry Responses API URL used by the web_search grounding tool.
+
+        Derived from `project_endpoint`; empty when it is unset (the tool then
+        reports itself unavailable rather than calling out). Idempotent whether
+        the project endpoint is bare or already suffixed with ``/openai/v1``.
+        """
+        ep = self.project_endpoint.strip().rstrip("/")
+        if not ep:
+            return ""
+        if ep.endswith("/openai/v1"):
+            return f"{ep}/responses"
+        return f"{ep}/openai/v1/responses"
+
+
+@lru_cache(maxsize=1)
+def get_foundry_settings() -> FoundrySettings:
+    """Process-wide cached Foundry settings. Call `get_foundry_settings.cache_clear()`
+    in tests if you need to reload after monkey-patching env vars."""
+    return FoundrySettings.from_env()
