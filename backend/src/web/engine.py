@@ -53,6 +53,7 @@ from ..core.policy_gate import PolicyGate
 from ..core.trace import Trace
 from ..nl.scope_to_scan import default_package, scope_from_package, scope_to_scan
 from ..reports.correlator import correlate
+from ..reports.remediation_enrich import enrich_remediation
 from ..skills.registry import SkillRegistry
 from ..targets.echo import EchoTargetAdapter
 from ..targets.oracle import NullOracle, SuccessOracle, resolve_placeholders
@@ -296,6 +297,8 @@ async def _run_campaign_async(
 
     summary = _summarize(pkg, scorecards, plan.skipped)
     report = correlate(scorecards, plan, registry, summary=summary)
+    report["remediation"] = await enrich_remediation(
+        report["remediation"], report["findings"])
 
     aclose = getattr(target, "aclose", None)
     if aclose is not None:
@@ -444,6 +447,8 @@ async def _run_campaign_agentic_async(
         plan = coord.last_plan
         scorecards = scorecards_from_trace(trace)
         report = correlate(scorecards, plan, registry, summary=summary)
+        report["remediation"] = await enrich_remediation(
+            report["remediation"], report["findings"])
     finally:
         await client.stop()
         aclose = getattr(target, "aclose", None)
