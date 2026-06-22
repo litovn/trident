@@ -141,11 +141,6 @@ the real Coordinator → vertical → PyRIT path.
 
 ### Recon — what works and how
 
-> **Target: AIGoat.** This recon manifest runs against the AIGoat PoC target
-> (local HTTP at `http://127.0.0.1:8000`). Start AIGoat first (`docker compose up`)
-> and set `AIGOAT_PASSWORD` (+ `FOUNDRY_ENDPOINT` / `az login`). To run the cheap
-> in-process smoke instead, set `target_profile_id: echo` in the manifest.
-
 ```powershell
 python -m src.cli `
   --manifest manifests/sample.yaml `
@@ -170,7 +165,7 @@ Outputs: `output/smoke-001-recon.html` + `output/smoke-001-recon.trace.jsonl`.
    on the manifest means the policy gate keeps only `phase ∈ {recon, both}` and blocks exploit-only
    techniques (`rule=mode_intent`).
 2. **scope → scan.** `scope_to_scan` drops any technique whose `needs_capabilities` the target
-   profile doesn't satisfy. AIGoat advertises `has_chat` + `has_retrieval` → all three leads survive.
+   profile doesn't satisfy. Echo advertises `has_chat` → all three leads survive.
 3. **Dispatch.** The Coordinator opens one *fenced* vertical session per layer, exposing only
    that layer's in-scope skills.
 4. **Execute + score (per technique).** Every skill funnels through `PyritRunner`:
