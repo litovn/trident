@@ -1,0 +1,206 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/t-nikital_microsoft/trident/report.schema.json",
+  "title": "TRIDENT campaign report",
+  "description": "Machine-readable data contract emitted as <campaign>.report.json by src/reports/json_report.py. This is the single artifact a frontend should consume to render a campaign. Produced from the per-vertical Scorecards via src/reports/correlator.correlate().",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema_version",
+    "generated_at",
+    "campaign_id",
+    "total_techniques_fired",
+    "total_successes",
+    "total_blocked",
+    "total_failed",
+    "layers_executed",
+    "findings",
+    "potential_chains",
+    "coverage",
+    "remediation",
+    "scorecards"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Semantic version of this contract (json_report.SCHEMA_VERSION). Check the major version to detect breaking changes.",
+      "examples": ["1.0.0"]
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC ISO-8601 timestamp of when the report was generated."
+    },
+    "campaign_id": {
+      "type": "string",
+      "description": "Identifier of the campaign (from the manifest)."
+    },
+    "coordinator_summary": {
+      "type": "string",
+      "description": "Natural-language synthesis written by the Coordinator agent. May be empty."
+    },
+    "layers_executed": {
+      "type": "array",
+      "description": "Layers that produced a scorecard, in execution order. May repeat if a layer ran more than once.",
+      "items": { "$ref": "#/definitions/layer" }
+    },
+    "total_techniques_fired": { "type": "integer", "minimum": 0 },
+    "total_successes": { "type": "integer", "minimum": 0 },
+    "total_blocked": { "type": "integer", "minimum": 0 },
+    "total_failed": { "type": "integer", "minimum": 0 },
+    "asr_per_layer": {
+      "type": "object",
+      "description": "Attack Success Rate per layer (0..1). Keys are layer names.",
+      "additionalProperties": { "type": "number" }
+    },
+    "oracle_hits_per_layer": {
+      "type": "object",
+      "description": "Count of deterministic SuccessOracle hits per layer. Keys are layer names.",
+      "additionalProperties": { "type": "integer" }
+    },
+    "potential_chains": {
+      "type": "array",
+      "description": "Cross-layer attack chains correlated post-hoc (NOT autonomously executed). A chain spans >= 2 distinct layers, sequenced by MITRE ATLAS tactic.",
+      "items": { "$ref": "#/definitions/chain" }
+    },
+    "coverage": { "$ref": "#/definitions/coverage" },
+    "remediation": {
+      "type": "array",
+      "description": "Microsoft controls that address the successful findings, most-impactful first.",
+      "items": { "$ref": "#/definitions/remediationItem" }
+    },
+    "findings": {
+      "type": "array",
+      "description": "Successful findings, enriched with catalog OWASP/ATLAS/severity/controls metadata.",
+      "items": { "$ref": "#/definitions/finding" }
+    },
+    "scorecards": {
+      "type": "array",
+      "description": "Raw per-vertical scorecards (one per layer executed).",
+      "items": { "$ref": "#/definitions/scorecard" }
+    }
+  },
+  "definitions": {
+    "layer": {
+      "type": "string",
+      "enum": ["prompt", "application", "model"],
+      "description": "The vulnerability layer a technique/agent targets."
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["critical", "high", "medium", "low", "info"],
+      "description": "MSRC AI bug-bar severity."
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["technique_id", "name", "layer", "severity"],
+      "properties": {
+        "technique_id": { "type": "string", "examples": ["TRD-PRM-001"] },
+        "name": { "type": "string" },
+        "layer": { "$ref": "#/definitions/layer" },
+        "owasp_id": { "type": "string", "examples": ["LLM01"] },
+        "owasp_name": { "type": "string" },
+        "atlas_tactic": { "type": "string" },
+        "atlas_technique": { "type": "string" },
+        "severity": { "$ref": "#/definitions/severity" },
+        "controls": {
+          "type": "array",
+          "description": "Microsoft controls that mitigate this finding.",
+          "items": { "type": "string" }
+        },
+        "evidence": {
+          "type": "string",
+          "description": "Raw target response / proof for this finding."
+        }
+      }
+    },
+    "chainStep": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["technique_id", "name", "layer", "severity"],
+      "properties": {
+        "technique_id": { "type": "string" },
+        "name": { "type": "string" },
+        "layer": { "$ref": "#/definitions/layer" },
+        "owasp_id": { "type": "string" },
+        "atlas_tactic": { "type": "string" },
+        "severity": { "$ref": "#/definitions/severity" }
+      }
+    },
+    "chain": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "layers", "blast_radius", "steps"],
+      "properties": {
+        "id": { "type": "string", "examples": ["chain-1"] },
+        "kind": { "type": "string", "examples": ["cross-layer"] },
+        "label": { "type": "string" },
+        "layers": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/layer" },
+          "minItems": 2
+        },
+        "blast_radius": { "$ref": "#/definitions/severity" },
+        "steps": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/chainStep" }
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "description": "Honest coverage: planned vs tested vs excluded.",
+      "additionalProperties": true,
+      "required": ["planned", "tested", "not_tested_in_scope", "excluded_pre_scan", "coverage_pct"],
+      "properties": {
+        "planned": { "type": "array", "items": { "type": "string" } },
+        "tested": { "type": "array", "items": { "type": "string" } },
+        "not_tested_in_scope": { "type": "array", "items": { "type": "string" } },
+        "excluded_pre_scan": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/excludedItem" }
+        },
+        "coverage_pct": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "excludedItem": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string" },
+        "layer": { "type": "string" },
+        "reason": { "type": "string" },
+        "missing": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "remediationItem": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["control", "addresses_findings"],
+      "properties": {
+        "control": { "type": "string" },
+        "addresses_findings": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "scorecard": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["layer", "techniques_fired", "successes", "blocked", "failed", "asr", "oracle_hits", "findings"],
+      "properties": {
+        "layer": { "$ref": "#/definitions/layer" },
+        "techniques_fired": { "type": "array", "items": { "type": "string" } },
+        "successes": { "type": "integer", "minimum": 0 },
+        "blocked": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "asr": { "type": "number" },
+        "oracle_hits": { "type": "integer", "minimum": 0 },
+        "findings": {
+          "type": "array",
+          "items": { "type": "object", "additionalProperties": true }
+        }
+      }
+    }
+  }
+}

@@ -19,6 +19,7 @@ from .core.trace import Trace
 from .orchestrator.coordinator import Coordinator
 from .reports.correlator import correlate, scorecards_from_trace
 from .reports.html_report import render
+from .reports.json_report import write_report
 from .skills.registry import SkillRegistry
 from .targets.adapter import TargetAdapter
 from .targets.aigoat import AIGoatTargetAdapter
@@ -118,8 +119,12 @@ async def _run(args: argparse.Namespace) -> None:
     html_out = out_dir / f"{manifest.campaign_id}.html"
     render(corr, html_out)
 
+    json_out = out_dir / f"{manifest.campaign_id}.report.json"
+    write_report(corr, json_out)
+
     print(json.dumps(corr, indent=2, default=str))
     print(f"\nReport: {html_out}")
+    print(f"Data  : {json_out}")
     print(f"Trace : {trace_path}")
 
 
