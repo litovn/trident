@@ -968,11 +968,7 @@
   .xr-wtag{display:flex;align-items:center;gap:6px;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#9aa3ad;margin-bottom:5px}
   .xr-gdot{width:6px;height:6px;border-radius:50%;background:#5a8fc0;flex:none}
   .xr-woven .xr-groundt{font-size:12.5px;color:#2c2c33;line-height:1.55}
-  .xr-woven .xr-secsrc{margin-top:9px;padding-top:8px}
-  /* inline citation markers woven into the prose, numbered to match the Sources chips below */
-  .xr-refs{white-space:nowrap}
-  .xr-refmark{font-size:9.5px;vertical-align:super;line-height:0;color:#2f6db0;text-decoration:none;font-weight:800;margin-left:1px}
-  .xr-refmark:hover{text-decoration:underline}
+  .xr-woven .xr-secsrc{margin-top:16px;padding-top:12px}
   .xr-gspin{width:12px;height:12px;border:2px solid rgba(0,0,0,.15);border-top-color:#2f6db0;border-radius:50%;display:inline-block;animation:xrspin .8s linear infinite}
   @keyframes xrspin{to{transform:rotate(360deg)}}
   .xr-foot{margin-top:34px;padding-top:16px;border-top:1px solid rgba(0,0,0,.1);font-size:11px;color:#8a8a92;line-height:1.6}
@@ -2018,9 +2014,7 @@ const REPORT = {
     var seenH={},czu=[];cz.forEach(function(c){var h=groundHost(c.url)||c.url;if(!seenH[h]){seenH[h]=1;czu.push(c);}});
     if(!ans&&!czu.length)return '';
     var shown=czu.slice(0,4);
-    // inline [n] markers after the prose -> click opens the source; numbers match the Sources chips below
-    var marks=shown.map(function(c,i){var u=(c.url||'').replace(/"/g,'%22');return '<a class="xr-refmark" href="'+u+'" target="_blank" rel="noopener noreferrer" title="'+esc2(xrStrip(c.title||groundHost(c.url)||'source'))+'">['+(i+1)+']</a>';}).join('');
-    var prose=ans?'<div class="xr-groundt">'+mdLite(ans)+(marks?' <span class="xr-refs">'+marks+'</span>':'')+'</div>':'';
+    var prose=ans?'<div class="xr-groundt">'+mdLite(ans)+'</div>':'';
     var srcs=shown.length?'<div class="xr-secsrc"><span class="xr-secsrck">Sources</span>'+shown.map(function(c,i){return groundCite(c,i+1);}).join('')+'</div>':'';
     return '<div class="xr-woven"><div class="xr-wtag"><span class="xr-gdot"></span>Live web context \u00b7 verify sources</div>'+prose+srcs+'</div>';
   }
