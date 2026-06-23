@@ -22,6 +22,7 @@ from .orchestrator.coordinator import Coordinator
 from .reports.correlator import correlate, scorecards_from_trace
 from .reports.html_report import render
 from .reports.json_report import write_report
+from .reports.remediation_enrich import enrich_remediation
 from .skills.registry import SkillRegistry
 from .targets.adapter import TargetAdapter
 from .targets.aigoat import AIGoatTargetAdapter
@@ -176,7 +177,7 @@ async def _run(args: argparse.Namespace) -> None:
         # Augment the remediation section with grounded, web-searched
         # descriptions + sources (additive, shape-preserving; degrades to the
         # plain control list when web grounding is unconfigured).
-        corr["remediation"] = await write_report(
+        corr["remediation"] = await enrich_remediation(
             corr["remediation"], corr["findings"])
     finally:
         await client.stop()

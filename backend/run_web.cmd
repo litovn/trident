@@ -2,7 +2,7 @@
 REM ============================================================
 REM  TRIDENT web bridge launcher (Windows)
 REM  Starts the backend engine + API and serves the frontend UI
-REM  (../frontend/frontend.html) on http://localhost:8765
+REM  (../frontend/index.html) on http://localhost:8765
 REM  Prefers the repo .venv if present, else uses python on PATH.
 REM  Usage:  run_web.cmd            (default port 8765)
 REM          run_web.cmd --port 9000
