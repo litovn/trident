@@ -2105,7 +2105,7 @@ const REPORT = {
       ? '<div class="xr-chain">'+steps+'</div>'+(R.chain&&R.chain.outcome?'<div class="xr-outcome">'+R.chain.outcome+'</div>':'')
       : '<div class="xr-sint">No multi-step attack chain was completed.</div>';
 
-    var fxRows=((R.fixes&&R.fixes.rows)||[]).slice().sort(function(a,b){return (/1/.test(a.priority)?0:1)-(/1/.test(b.priority)?0:1);}).slice(0,4);
+    var fxRows=((R.fixes&&R.fixes.rows)||[]).slice().sort(function(a,b){return (/1/.test(a.priority)?0:1)-(/1/.test(b.priority)?0:1);});
     var fx=fxRows.map(function(f){
       var pc=/1/.test(f.priority)?'#e0484f':'#d99a55';
       var ctrls=(f.controls||[]).map(function(c){return '<span class="xr-ctrl">'+esc2(c)+'</span>';}).join('');
