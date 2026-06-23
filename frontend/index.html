@@ -2164,12 +2164,6 @@ const REPORT = {
     }).join('');
     var evidenceHtml=evHtml||'<div class="xr-sint">No captured exchanges available for this run.</div>';
 
-    var lv=(R.fixes&&R.fixes.levels)||null;
-    var lvHtml=lv&&lv.rows?lv.rows.map(function(l){
-      return '<div class="xr-lvl'+(l.current?' cur':'')+'"><div class="xr-lvi">'+esc2(l.id)+(l.current?' <span class="xr-now">THIS RUN</span>':'')+'</div>'+
-        '<div class="xr-lve">'+esc2(l.ex||'')+'</div><div class="xr-lvp">'+(l.pj||'')+'</div></div>';
-    }).join(''):'';
-
     var trHtml=(R.trace||[]).map(function(r){
       var kc={dispatch:'#9b8cbb',gate:'#5fb0c4',exec:'#c2879f'}[r.kind]||'#8d98a6';
       return '<div class="xr-trow"><span class="xr-tt">'+esc2(r.t||'')+'</span><span class="xr-tk" style="color:'+kc+'">'+esc2(r.kind||'')+'</span><span class="xr-tm">'+esc2(xrStrip(r.msg||''))+'</span></div>';
@@ -2226,7 +2220,6 @@ const REPORT = {
 
       '<div class="xr-section"><div class="xr-sh"><span class="xr-num">10</span>What to fix first</div>'+
         '<p class="xr-sint">'+esc2((R.fixes&&R.fixes.intro)||'Prioritised actions. P1 breaks the attack chain, P2 closes remaining gaps.')+'</p>'+groundSlot('fix')+fixesHtml+
-        (lvHtml?'<div class="xr-subh">'+esc2((lv&&lv.title)||'Then prove the fixes work')+'</div><p class="xr-sint">'+esc2((lv&&lv.intro)||'')+'</p><div class="xr-levels">'+lvHtml+'</div>':'')+
         '</div>'+
 
       '<div class="xr-foot">Scored against MITRE ATLAS and the OWASP GenAI Top 10, with severity following the Microsoft MSRC AI bug bar. '+
@@ -2238,10 +2231,12 @@ const REPORT = {
       '<div class="xr-top"><div class="lg" role="button" tabindex="0" title="Back to home" onclick="window.TRIDENT_goHome&&window.TRIDENT_goHome()"><img src="'+MARK+'" alt="TRIDENT home"></div>'+
       '<span class="xr-rid">'+esc2((R.meta&&R.meta.runId)||'')+'</span><span class="sp"></span>'+
       '<button class="xr-btn primary" id="xr-print">\u2913 Save as PDF</button>'+
+      '<button class="xr-btn white" id="xr-download">\u2913 Download file</button>'+
       '<button class="xr-btn white" id="xr-close">Close</button></div>'+page;
 
     document.getElementById('xr-close').onclick=function(){hide('exportReport');};
     document.getElementById('xr-print').onclick=function(){printExport();};
+    document.getElementById('xr-download').onclick=function(){downloadReport();};
     document.getElementById('exportReport').scrollTop=0;
   }
 
@@ -2250,6 +2245,33 @@ const REPORT = {
     var done=function(){document.body.classList.remove('printing');window.removeEventListener('afterprint',done);};
     window.addEventListener('afterprint',done);
     setTimeout(function(){window.print();},60);
+  }
+  // Reliable "get the file out" path that works even in embedded webviews (e.g. VS Code's Simple
+  // Browser) where window.print() is a no-op: serialise the rendered report into a self-contained
+  // HTML file (all <style> blocks + stylesheet links inlined, charts are already inline SVG) and
+  // trigger a real download. The file auto-opens the print dialog on load, so the user lands one
+  // keystroke from "Save as PDF" in any real browser.
+  function downloadReport(){
+    var page=document.querySelector('#exportReport .xr-page');
+    if(!page){printExport();return;}
+    var head='';
+    document.querySelectorAll('link[rel="stylesheet"]').forEach(function(l){head+='<link rel="stylesheet" href="'+l.href+'">';});
+    document.querySelectorAll('style').forEach(function(s){head+='<style>'+s.textContent+'</style>';});
+    var rid=String((R&&R.meta&&R.meta.runId)||'report');
+    var safe=rid.replace(/[^\w.-]+/g,'_');
+    var doc='<!doctype html><html lang="en"><head><meta charset="utf-8">'+
+      '<meta name="viewport" content="width=device-width,initial-scale=1">'+
+      '<title>TRIDENT Report '+esc2(rid)+'</title>'+head+
+      '<style>html,body{margin:0;background:#fff}.xr-page{margin:0 auto}@media print{@page{size:A4;margin:13mm}}</style>'+
+      '</head><body>'+page.outerHTML+
+      '<scr'+'ipt>window.addEventListener("load",function(){setTimeout(function(){try{window.print();}catch(e){}},400);});</scr'+'ipt>'+
+      '</body></html>';
+    var blob=new Blob([doc],{type:'text/html;charset=utf-8'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url;a.download='TRIDENT-report-'+safe+'.html';
+    document.body.appendChild(a);a.click();
+    setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},1500);
   }
 
   // ---------- DASHBOARD ----------
@@ -2475,17 +2497,11 @@ const REPORT = {
         '<div><span class="pr'+p2+'">'+f.priority+'</span><span class="ft">'+f.title+'</span></div>'+
         '<div class="fw">'+(f.why||'')+'</div>'+(ctrls?'<div class="fc">'+ctrls+'</div>':'')+'</div></div>';
     }).join('');
-    var lv=(F.levels&&F.levels.rows||[]).map(function(l){
-      return '<div class="lvl'+(l.current?' cur':'')+'"><div class="li">'+l.id+(l.current?' <span class="now">THIS RUN</span>':'')+'</div>'+
-        '<div class="le">'+(l.ex||'')+'</div><div class="lp">'+(l.pj||'')+'</div></div>';
-    }).join('');
     document.getElementById('remed').innerHTML=
       topbar('Remediations','<button class="db-btn" id="rm-back">\u2039 Back to report</button>')+
       '<div class="rm-body"><h1 class="rm-h">'+(F.title||'What to fix first')+'</h1>'+
       '<p class="rm-sub">'+(F.intro||'')+'</p>'+
       '<div class="rm-grid">'+fixes+'</div>'+
-      (lv?'<h2 style="font-family:\'Newsreader\',serif;font-size:20px;font-weight:600;margin:34px 0 4px;color:#fff">'+(F.levels.title||'')+'</h2>'+
-          '<p class="rm-sub">'+(F.levels.intro||'')+'</p><div class="rm-levels">'+lv+'</div>':'')+
       '</div>';
     document.getElementById('rm-back').onclick=function(){hide('remed');};
     var rem=document.getElementById('remed');
