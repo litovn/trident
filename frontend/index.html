@@ -192,6 +192,9 @@
     .sidebar{position:absolute;z-index:30;height:100%;box-shadow:var(--ring)}
     body:not(.collapsed) .scrim{position:absolute;inset:0;background:rgba(0,0,0,.35);z-index:20}
     body.collapsed .sidebar{width:60px}
+    /* keep the composer clear of the collapsed sidebar rail so the text box is never hidden behind it */
+    body.collapsed .composer-wrap{padding-left:84px}
+    body.collapsed.chat-on .composer-wrap{left:60px;padding-left:24px}
   }
 
   @keyframes glowpulse{0%,100%{opacity:.8}50%{opacity:1}}
