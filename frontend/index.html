@@ -721,6 +721,8 @@
   .rc-hitl .htxt span{display:block;font-size:12.5px;color:#9a9aa3;margin-top:3px;line-height:1.4}
   .rc-go{display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 22px;border-radius:11px;font-size:14px;font-weight:700;color:#04141a;background:#36d1e0;border:none;cursor:pointer;box-shadow:0 0 18px rgba(54,209,224,.5);white-space:nowrap}
   .rc-go:hover{background:#5ee0ee}
+  .rc-go:disabled{opacity:.4;cursor:not-allowed;box-shadow:none;filter:grayscale(.4)}
+  .rc-go:disabled:hover{background:#36d1e0}
   /* recon-mode recommended packages (top 4, collapsed) */
   .rc-opts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px;align-items:stretch}
   .rc-opts .rc-opt{display:flex;flex-direction:column}
@@ -2739,7 +2741,10 @@ const REPORT = {
     if(RECON_PLAN&&RECON_PLAN.length){top=RECON_PLAN.map(function(c){var bp=byId(c.id);return bp?{pkg:bp,sim:c.sim||'0.90'}:null;}).filter(Boolean);}
     if(!top||!top.length)top=matchPackagesTop(RECON_PROMPT,4);
     var pkg=top[0].pkg;
-    var selIdx=0;
+    // No package is pre-selected in recon: the operator must explicitly pick one of the
+    // recommended packages before "Authorize & launch" is enabled, so an attack is never
+    // fired against a silent default. The already-launched view keeps idx 0.
+    var selIdx=launched?0:-1;
     // Split each package's techniques: capability-gated ones are auto-skipped on this target.
     var gate={};P.skipped.forEach(function(s){gate[s.id]=s.need;});
     function reconPlanRows(pp){
@@ -2794,8 +2799,8 @@ const REPORT = {
     var hitl = launched
       ? '<div class="rc-hitl launched"><div class="htxt"><b>Attack already launched</b><span>This recon already led to an attack run. Open the attack report to review the results.</span></div>'+
         '<button class="rc-go view" id="rc-go">View launched attack <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>'
-      : '<div class="rc-hitl"><div class="htxt"><b>Human authorization required (HITL)</b><span>Recon does not attack. TRIDENT recommends the <b style="color:#7fe6f2" id="rc-selname">'+esc2(pkg.name)+'</b> package. Authorize to launch it against the target.</span></div>'+
-        '<button class="rc-go" id="rc-go">Authorize &amp; launch attack <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>';
+      : '<div class="rc-hitl"><div class="htxt"><b>Human authorization required (HITL)</b><span>Recon does not attack. Select an attack package above (recommended: <b style="color:#7fe6f2">'+esc2(pkg.name)+'</b>), then authorize to launch it against the target. Selected: <b style="color:#7fe6f2" id="rc-selname">none yet</b></span></div>'+
+        '<button class="rc-go" id="rc-go" disabled>Authorize &amp; launch attack <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>';
     var body='<div class="rc-body"><div class="rc-grid">'+
       '<div class="panel" style="grid-column:1/-1"><div class="ph">Target identity</div><div class="rc-id">'+idrows+'</div></div>'+
       '<div class="panel" style="grid-column:1/-1"><div class="ph">Recon findings \u00b7 no exploits run</div>'+findings+'</div>'+
@@ -2807,8 +2812,9 @@ const REPORT = {
     document.getElementById('rc-back').onclick=function(){hide('recon');if(window.TRIDENT_home)window.TRIDENT_home();};
     (function(){
       var opts=document.querySelectorAll('#recon .rc-opt'),selName=document.getElementById('rc-selname');
+      var goBtn=document.getElementById('rc-go');
       Array.prototype.forEach.call(opts,function(o){
-        o.onclick=function(){Array.prototype.forEach.call(opts,function(x){x.classList.remove('sel');});o.classList.add('sel');selIdx=parseInt(o.getAttribute('data-idx'),10)||0;if(selName)selName.textContent=o.getAttribute('data-name');};
+        o.onclick=function(){Array.prototype.forEach.call(opts,function(x){x.classList.remove('sel');});o.classList.add('sel');selIdx=parseInt(o.getAttribute('data-idx'),10)||0;if(selName)selName.textContent=o.getAttribute('data-name');if(goBtn&&!launched)goBtn.disabled=false;};
         var tg=o.querySelector('[data-act="toggle"]'),det=o.querySelector('.rc-detail');
         if(tg&&det)tg.onclick=function(e){e.stopPropagation();det.classList.toggle('open');tg.textContent=det.classList.contains('open')?'Hide':'Techniques';};
         Array.prototype.forEach.call(o.querySelectorAll('.pk-tx'),function(btn){
@@ -2819,6 +2825,7 @@ const REPORT = {
     })();
     document.getElementById('rc-go').onclick=function(){
       if(launched){ hide('recon'); window.TRIDENT_launch(RECON_PROMPT||'',RECON_TRACE,true,top[selIdx].pkg.techniques); return; }
+      if(selIdx<0)return;   // must explicitly pick an attack package first
       if(window.setTridentMode)window.setTridentMode('attack');
       if(window.__TRIDENT_markAttacked)window.__TRIDENT_markAttacked();
       // Open the chat (not the red terminal scan overlay): the shared live progress

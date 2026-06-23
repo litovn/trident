@@ -538,23 +538,12 @@ _PKG_STOP = frozenset({
     "the", "and", "for", "with", "that", "this", "your", "you", "are", "our", "all",
     "can", "run", "test", "just", "want", "into", "from", "like", "real", "only",
     "any", "out", "get", "let", "give", "does", "what", "how", "its", "use",
-    "using", "about", "make",
-    # Generic scoping / target words that name *no* concrete attack, objective, or
-    # layer. They appear in package names and intent-examples ("attack the ... layer")
-    # but do not disambiguate a package, so they must not count as a real signal —
-    # otherwise vague prompts like "attack the layer where the target is" would wrongly
-    # resolve to packages instead of triggering clarifying questions. The disambiguating
-    # noun (prompt / application / model / rag / tool / ...) survives and carries the signal.
-    "attack", "attacks", "layer", "layers", "target", "targets", "surface",
+    "using", "about", "make", "attack", "attacks", "layer", "layers", "target", "targets", "surface",
     "system", "systems", "where", "here", "there", "chatbot", "bot", "assistant",
     "underlying", "active", "thing", "stuff",
 })
 _AXIS_PRIOR = {"focus": 0.6, "layer": 0.4, "profile": 0.2}
-# An explicit catalog code (technique or package) is always a concrete signal.
 _CODE_RE = re.compile(r"\b(?:TRD-[A-Z]{3}-[A-Z0-9]{2,4}|PKG-[A-Z0-9]+)\b", re.IGNORECASE)
-# An explicit "you decide / recommend" request — the operator handing the choice to
-# us. Honouring it *is* helping them choose, so we propose even without a named
-# attack. (This is the operator opting in, never the advisor forcing a decision.)
 _RECOMMEND_RE = re.compile(
     r"\b(recommend\w*|suggest\w*|propose|"
     r"which (?:one|package|attack)|"
@@ -613,11 +602,6 @@ def _score_packages(registry: SkillRegistry, query: str, mode: str):
     return out
 
 
-# Curated "concrete attack" vocabulary, mined once per registry/mode from the fields
-# operators actually phrase intent with — package names / aliases / intent-examples and
-# technique names / aliases / intent-examples — after dropping generic scoping words via
-# ``_pkg_words``. Description prose is deliberately excluded so incidental common words
-# ("more", "tell", ...) never read as a real signal.
 _SIGNAL_VOCAB_CACHE: dict[tuple[int, str], frozenset[str]] = {}
 
 
@@ -663,10 +647,6 @@ def _wants_recommendation(text: str) -> bool:
     return bool(_RECOMMEND_RE.search(text or ""))
 
 
-# Helpful, *rotating* clarifying questions for the offline advisor (the live LLM
-# writes its own when Foundry is present). Each round digs a layer deeper and always
-# leaves the operator a way forward — including just asking us to recommend. We keep
-# cycling these (the last set repeats) instead of ever forcing a proposal.
 _CLARIFY_ROUNDS: list[list[str]] = [
     ["What are you trying to achieve — broad coverage, or a specific objective "
      "(data exfiltration, jailbreak / guardrail bypass, RAG / tool abuse, model recon)?"],
@@ -705,10 +685,6 @@ def _offline_plan(history: list[dict], mode: str, top_n: int) -> dict[str, Any]:
     last_user = (user_msgs[-1].get("content") or "") if user_msgs else ""
     rounds = sum(1 for m in history if (m or {}).get("role") == "assistant")
     scored = _score_packages(registry, combined, mode)
-    # Keep asking helpful, rotating questions until the request carries a concrete
-    # attack signal (objective / technique / layer / profile / code) or the operator
-    # asks us to recommend. No round cap — the conversation runs until it is ready, and
-    # a proposal is never forced.
     concrete = _specific_signal(registry, combined, mode) or _wants_recommendation(last_user)
     if not scored or not concrete:
         return {"kind": "clarify", "engine": "advisor-offline",
@@ -759,8 +735,6 @@ def plan(history: list[dict], mode: str = "attack", top_n: int = 4) -> dict[str,
     last_user = next((m.get("content") or "" for m in reversed(history)
                       if m.get("role") == "user"), "")
     rounds = sum(1 for m in history if m.get("role") == "assistant")
-    # A concrete attack signal — or an explicit "recommend / you pick" — is what turns
-    # the conversation into a proposal. Otherwise we keep helping (no round cap).
     concrete = _specific_signal(registry, combined, mode) or _wants_recommendation(last_user)
     if os.environ.get("FOUNDRY_ENDPOINT") or os.environ.get("AZURE_OPENAI_ENDPOINT"):
         try:
@@ -770,9 +744,6 @@ def plan(history: list[dict], mode: str = "attack", top_n: int = 4) -> dict[str,
             if turn.kind == "propose" and turn.candidates and concrete:
                 return {"kind": "propose", "engine": "advisor-llm", "questions": [],
                         "candidates": [_candidate_payload(c) for c in turn.candidates]}
-            # Either the LLM chose to keep talking, or it tried to propose for a still-
-            # vague request — keep the conversation going with its question (or a default).
-            # The operator drives when we commit; we never force a proposal.
             questions = list(turn.questions) or _clarify_questions(mode, rounds)
             return {"kind": "clarify", "engine": "advisor-llm",
                     "questions": questions, "candidates": []}
