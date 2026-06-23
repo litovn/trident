@@ -239,7 +239,7 @@
     font-family:"universalSans",Inter,system-ui,sans-serif}
   #scan.on,#remed.on{display:block}
   #dboard.on{display:grid;grid-template-rows:auto 1fr}
-  .db-top{display:flex;align-items:center;gap:14px;height:56px;padding:0 22px;border-bottom:1px solid rgba(255,255,255,.08)}
+  .db-top{display:flex;align-items:center;gap:14px;min-height:56px;padding:8px 22px;border-bottom:1px solid rgba(255,255,255,.08);flex-wrap:wrap;row-gap:8px}
   .db-top .lg{display:flex;align-items:center;gap:10px;cursor:pointer;transition:opacity .15s,transform .15s}
   .db-top .lg:hover{opacity:.82;transform:translateY(-1px)}
   .db-top .lg:active{transform:translateY(0)}
@@ -248,8 +248,8 @@
   .db-top .tag{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:#e11d2a;letter-spacing:.12em;text-transform:uppercase;padding:3px 9px;border:1px solid rgba(225,29,42,.4);border-radius:6px}
   .db-top .rid{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:#76767d;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .db-top .sp{flex:1}
-  .db-top .db-acts{display:flex;align-items:center;gap:8px}
-  .db-top .db-nav{display:flex;align-items:center;gap:8px}
+  .db-top .db-acts{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  .db-top .db-nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .db-btn.newscan{background:#f4f4f5;border-color:transparent;color:#15151a;font-weight:700}
   .db-btn.newscan:hover{background:#fff}
   .db-btn{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 15px;border-radius:9px;font-size:13.5px;font-weight:600;color:#f4f4f5;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.02);cursor:pointer;white-space:nowrap;flex-shrink:0}
