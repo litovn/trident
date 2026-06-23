@@ -246,13 +246,13 @@
   .db-top .lg img{width:auto;height:26px;object-fit:contain;filter:drop-shadow(0 0 6px rgba(225,29,42,.5))}
   .db-top .lg b{font-family:'Newsreader',Georgia,serif;font-weight:600;font-size:20px}
   .db-top .tag{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:#e11d2a;letter-spacing:.12em;text-transform:uppercase;padding:3px 9px;border:1px solid rgba(225,29,42,.4);border-radius:6px}
-  .db-top .rid{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:#76767d}
+  .db-top .rid{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:#76767d;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .db-top .sp{flex:1}
   .db-top .db-acts{display:flex;align-items:center;gap:8px}
   .db-top .db-nav{display:flex;align-items:center;gap:8px}
   .db-btn.newscan{background:#f4f4f5;border-color:transparent;color:#15151a;font-weight:700}
   .db-btn.newscan:hover{background:#fff}
-  .db-btn{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 15px;border-radius:9px;font-size:13.5px;font-weight:600;color:#f4f4f5;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.02);cursor:pointer}
+  .db-btn{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 15px;border-radius:9px;font-size:13.5px;font-weight:600;color:#f4f4f5;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.02);cursor:pointer;white-space:nowrap;flex-shrink:0}
   .db-btn:hover{background:rgba(255,255,255,.07)}
   .db-btn.red{background:#e11d2a;border-color:transparent;color:#fff}
   .db-btn.red:hover{background:#f02534}
@@ -880,7 +880,7 @@
   .xr-top .lg img{width:auto;height:26px;object-fit:contain;filter:drop-shadow(0 0 6px rgba(225,29,42,.5))}
   .xr-top .xr-rid{font-size:12px;color:#82828c;font-family:ui-monospace,monospace}
   .xr-top .sp{flex:1}
-  .xr-btn{cursor:pointer;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:#f4f4f5;font:inherit;font-size:13px;font-weight:600;padding:8px 15px;border-radius:8px;transition:.15s}
+  .xr-btn{cursor:pointer;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:#f4f4f5;font:inherit;font-size:13px;font-weight:600;padding:8px 15px;border-radius:8px;transition:.15s;white-space:nowrap;flex-shrink:0}
   .xr-btn:hover{background:rgba(255,255,255,.1)}
   .xr-btn.primary{background:#e11d2a;border-color:transparent;color:#fff}
   .xr-btn.primary:hover{background:#f02534}
