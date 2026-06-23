@@ -1964,9 +1964,12 @@ const REPORT = {
     var winNames=wins.slice(0,3).map(function(t){return t.what;}).filter(Boolean);
     var reconNames=T.filter(function(t){return /recon/i.test(t.what||'');}).slice(0,3).map(function(t){return (t.what||'').replace(/\s*\(recon\)/i,'');}).filter(Boolean);
     var chainTitles=((R&&R.chain&&R.chain.steps)||[]).slice(0,4).map(function(s){return s.title;}).filter(Boolean);
-    // Shared style contract: keep answers short, woven-ready, and free of headings or a
-    // trailing references list (citations are rendered separately as source chips).
-    var STYLE=' Answer in 2-4 concise, report-ready sentences of plain analytical prose that can be woven directly into a security report. Do not use headings, bullet lists, markdown, or a trailing references/sources list; write in a neutral third-person tone.';
+    // Shared style contract: keep answers short and woven-ready (no headings/bullets), but ASK for
+    // the source URLs in a trailing "Sources:" line. This deployment has no structured url_citation
+    // annotations, so the backend harvests citations from inline URLs in the text; the frontend
+    // (groundClean) then strips that trailing block from the displayed prose, keeping it clean while
+    // still surfacing the numbered citation markers + chips.
+    var STYLE=' Answer in 2-4 concise, report-ready sentences of plain analytical prose that can be woven directly into a security report; use a neutral third-person tone with no headings, bullet lists, or markdown. After the prose, on a new line write "Sources:" followed by the full URLs of the 2-4 most relevant public sources, one per line.';
     var specs=[];
     specs.push({key:'summary',label:'Industry context',q:'As of 2026, give brief executive context on the current AI red-teaming and LLM-application security threat landscape relevant to a system like '+tgt+'.'+STYLE});
     if(reconNames.length)specs.push({key:'recon',label:'How attackers profile targets',q:'Briefly explain the open-source intelligence and model-fingerprinting techniques attackers use to profile LLM applications such as '+tgt+', covering: '+reconNames.join('; ')+'.'+STYLE});
