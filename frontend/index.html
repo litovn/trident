@@ -1023,7 +1023,14 @@
   @media(max-width:720px){.xr-kpis{grid-template-columns:repeat(2,1fr)}.xr-charts{grid-template-columns:1fr}.xr-gloss{grid-template-columns:1fr}.xr-page{padding:28px 22px}}
   @media print{
     @page{size:A4;margin:13mm}
-    html,body{background:#ffffff!important}
+    /* The app body is normally clamped to one viewport (height:100vh; overflow:hidden);
+       reset that for print so a long report flows across pages instead of clipping to page 1. */
+    html,body{background:#ffffff!important;height:auto!important;min-height:0!important;overflow:visible!important}
+    /* Decorative fixed layers (red glow / grid / matrix) must not print: a position:fixed
+       element with filter:blur rasterises as an opaque white box over the first page in PDFs. */
+    body::before,body::after{display:none!important;content:none!important}
+    #matrix{display:none!important}
+    body.printing{display:block!important}
     body.printing>*{display:none!important}
     body.printing #exportReport{display:block!important;position:static!important;inset:auto!important;overflow:visible!important;background:#ffffff!important;height:auto!important}
     .xr-top,.no-print{display:none!important}
@@ -2242,12 +2249,10 @@ const REPORT = {
       '<div class="xr-top"><div class="lg" role="button" tabindex="0" title="Back to home" onclick="window.TRIDENT_goHome&&window.TRIDENT_goHome()"><img src="'+MARK+'" alt="TRIDENT home"></div>'+
       '<span class="xr-rid">'+esc2((R.meta&&R.meta.runId)||'')+'</span><span class="sp"></span>'+
       '<button class="xr-btn primary" id="xr-print">\u2913 Save as PDF</button>'+
-      '<button class="xr-btn white" id="xr-download">\u2913 Download file</button>'+
       '<button class="xr-btn white" id="xr-close">Close</button></div>'+page;
 
     document.getElementById('xr-close').onclick=function(){hide('exportReport');};
     document.getElementById('xr-print').onclick=function(){printExport();};
-    document.getElementById('xr-download').onclick=function(){downloadReport();};
     document.getElementById('exportReport').scrollTop=0;
   }
 
@@ -2265,34 +2270,6 @@ const REPORT = {
     window.addEventListener('afterprint',done);
     setTimeout(function(){window.print();},60);
   }
-  // Reliable "get the file out" path that works even in embedded webviews (e.g. VS Code's Simple
-  // Browser) where window.print() is a no-op: serialise the rendered report into a self-contained
-  // HTML file (all <style> blocks + stylesheet links inlined, charts are already inline SVG) and
-  // trigger a real download. The file auto-opens the print dialog on load, so the user lands one
-  // keystroke from "Save as PDF" in any real browser.
-  function downloadReport(){
-    var page=document.querySelector('#exportReport .xr-page');
-    if(!page){printExport();return;}
-    var head='';
-    document.querySelectorAll('link[rel="stylesheet"]').forEach(function(l){head+='<link rel="stylesheet" href="'+l.href+'">';});
-    document.querySelectorAll('style').forEach(function(s){head+='<style>'+s.textContent+'</style>';});
-    var rid=String((R&&R.meta&&R.meta.runId)||'report');
-    var safe=rid.replace(/[^\w.-]+/g,'_');
-    var doc='<!doctype html><html lang="en"><head><meta charset="utf-8">'+
-      '<meta name="viewport" content="width=device-width,initial-scale=1">'+
-      '<title>TRIDENT Report '+esc2(rid)+'</title>'+head+
-      '<style>html,body{margin:0;background:#fff}.xr-page{margin:0 auto}@media print{@page{size:A4;margin:13mm}}</style>'+
-      '</head><body>'+page.outerHTML+
-      '<scr'+'ipt>window.addEventListener("load",function(){setTimeout(function(){try{window.print();}catch(e){}},400);});</scr'+'ipt>'+
-      '</body></html>';
-    var blob=new Blob([doc],{type:'text/html;charset=utf-8'});
-    var url=URL.createObjectURL(blob);
-    var a=document.createElement('a');
-    a.href=url;a.download='TRIDENT-report-'+safe+'.html';
-    document.body.appendChild(a);a.click();
-    setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},1500);
-  }
-
   // ---------- DASHBOARD ----------
   function buildDash(){
     var v=R.verdict||{}, VC=R.verdictColor||'#9a9aa3';
