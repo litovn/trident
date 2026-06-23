@@ -962,12 +962,13 @@
   .xr-gq{font-weight:400;text-transform:none;letter-spacing:0;color:#9a9aa3;font-size:11px}
   .xr-ground.pending{background:#fafafa}
   .xr-gslot:empty{display:none}
-  .xr-genrich{margin-top:13px;padding:11px 13px;border:1px solid rgba(0,0,0,.1);border-left:3px solid #2f6db0;border-radius:9px;background:#f5f8fb}
-  .xr-genrich.loading{display:flex;align-items:center;gap:9px;color:#6b6b73;font-size:12px;font-style:italic;background:#fafafa;border-left-color:#c9c9d1}
-  .xr-genrich-h{display:flex;align-items:center;gap:7px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#2f6db0;margin-bottom:6px}
-  .xr-gdot{width:7px;height:7px;border-radius:50%;background:#2f6db0;flex:none}
-  .xr-genrich .xr-groundt{font-size:12.5px;color:#33333a}
-  .xr-genrich .xr-secsrc{margin-top:9px;padding-top:8px}
+  /* woven web-grounded enrichment: reads as part of the section narrative, not a separate card */
+  .xr-woven{margin:9px 0 2px;padding-left:12px;border-left:2px solid #d4dde7}
+  .xr-woven.loading{display:flex;align-items:center;gap:9px;color:#6b6b73;font-size:12px;font-style:italic;border-left-color:#e4e4ea;padding:2px 0 2px 12px}
+  .xr-wtag{display:flex;align-items:center;gap:6px;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#9aa3ad;margin-bottom:5px}
+  .xr-gdot{width:6px;height:6px;border-radius:50%;background:#5a8fc0;flex:none}
+  .xr-woven .xr-groundt{font-size:12.5px;color:#2c2c33;line-height:1.55}
+  .xr-woven .xr-secsrc{margin-top:9px;padding-top:8px}
   .xr-gspin{width:12px;height:12px;border:2px solid rgba(0,0,0,.15);border-top-color:#2f6db0;border-radius:50%;display:inline-block;animation:xrspin .8s linear infinite}
   @keyframes xrspin{to{transform:rotate(360deg)}}
   .xr-foot{margin-top:34px;padding-top:16px;border-top:1px solid rgba(0,0,0,.1);font-size:11px;color:#8a8a92;line-height:1.6}
@@ -1959,12 +1960,15 @@ const REPORT = {
     var winNames=wins.slice(0,3).map(function(t){return t.what;}).filter(Boolean);
     var reconNames=T.filter(function(t){return /recon/i.test(t.what||'');}).slice(0,3).map(function(t){return (t.what||'').replace(/\s*\(recon\)/i,'');}).filter(Boolean);
     var chainTitles=((R&&R.chain&&R.chain.steps)||[]).slice(0,4).map(function(s){return s.title;}).filter(Boolean);
+    // Shared style contract: keep answers short, woven-ready, and free of headings or a
+    // trailing references list (citations are rendered separately as source chips).
+    var STYLE=' Answer in 2-4 concise, report-ready sentences of plain analytical prose that can be woven directly into a security report. Do not use headings, bullet lists, markdown, or a trailing references/sources list; write in a neutral third-person tone.';
     var specs=[];
-    specs.push({key:'summary',label:'Industry context',q:'Executive context on the current AI red-teaming and LLM security threat landscape and benchmarks in 2026, relevant to systems like '+tgt+'.'});
-    if(reconNames.length)specs.push({key:'recon',label:'How attackers profile targets',q:'Open-source intelligence and model-fingerprinting techniques attackers use to profile LLM applications such as '+tgt+': '+reconNames.join('; ')+'.'});
-    if(winNames.length)specs.push({key:'findings',label:'Related public advisories',q:'Public advisories, documented real-world incidents and OWASP/MITRE references for these AI attack techniques: '+winNames.join('; ')+'.'});
-    if(chainTitles.length)specs.push({key:'chain',label:'Real-world attack chains',q:'Documented multi-step attack chains and kill-chains against LLM applications combining steps like: '+chainTitles.join('; ')+'.'});
-    specs.push({key:'fix',label:'Field-tested mitigations',q:winNames.length?'Recommended, field-tested mitigations and defensive controls for these AI attack techniques against '+tgt+': '+winNames.join('; ')+'.':'OWASP LLM Top 10 mitigations and current prompt-injection and jailbreak defenses for '+tgt+'.'});
+    specs.push({key:'summary',label:'Industry context',q:'As of 2026, give brief executive context on the current AI red-teaming and LLM-application security threat landscape relevant to a system like '+tgt+'.'+STYLE});
+    if(reconNames.length)specs.push({key:'recon',label:'How attackers profile targets',q:'Briefly explain the open-source intelligence and model-fingerprinting techniques attackers use to profile LLM applications such as '+tgt+', covering: '+reconNames.join('; ')+'.'+STYLE});
+    if(winNames.length)specs.push({key:'findings',label:'Related public advisories',q:'Briefly describe known public advisories and documented real-world impact, plus the OWASP LLM Top 10 / MITRE ATLAS relevance, for these AI attack techniques: '+winNames.join('; ')+'.'+STYLE});
+    if(chainTitles.length)specs.push({key:'chain',label:'Real-world attack chains',q:'Briefly describe how attackers combine steps like the following into a documented multi-step attack chain against LLM applications: '+chainTitles.join('; ')+'.'+STYLE});
+    specs.push({key:'fix',label:'Field-tested mitigations',q:(winNames.length?'Briefly recommend specific, field-tested mitigations and defensive controls for these AI attack techniques against '+tgt+': '+winNames.join('; ')+'.':'Briefly summarize current best-practice OWASP LLM Top 10 mitigations and prompt-injection and jailbreak defenses relevant to '+tgt+'.')+STYLE});
     return specs;
   }
   function startGrounding(){
@@ -1989,20 +1993,27 @@ const REPORT = {
     var u=c.url||'';var t=xrStrip(c.title||groundHost(u)||'source');var h=groundHost(u);
     return '<a class="xr-cite" href="'+u.replace(/"/g,'%22')+'" target="_blank" rel="noopener noreferrer"><span class="xr-cn">'+n+'</span><span class="xr-ct">'+esc2(t)+'</span>'+(h?'<span class="xr-cd">'+esc2(h)+'</span>':'')+'</a>';
   }
-  // grounded enrichment for ONE section, from that section's own web query
+  // strip a trailing "References:/Sources:" block some deployments append inline, so the
+  // woven prose never duplicates the citation chips we render separately from g.citations.
+  function groundClean(s){
+    return String(s||'').replace(/\n+\s*(references|sources|citations)\s*:[\s\S]*$/i,'').replace(/\n{3,}/g,'\n\n').trim();
+  }
+  // grounded enrichment for ONE section: woven into the section narrative (not a separate card)
   function groundEnrich(key){
     var g=(R&&R._ground&&R._ground[key])||null;
     if(!g)return '';
     if(g.status==='loading'||g.status==='idle')
-      return '<div class="xr-genrich loading"><span class="xr-gspin"></span>Grounding this section with live public-web intelligence\u2026</div>';
+      return '<div class="xr-woven loading"><span class="xr-gspin"></span>adding live web context\u2026</div>';
     if(g.status!=='ok')return '';
+    var ans=groundClean(g.answer);
     var cz=(g.citations||[]).filter(function(c){return c&&c.url;});
-    var hasA=!!(g.answer&&g.answer.trim());
-    if(!hasA&&!cz.length)return '';
+    // dedupe by host and keep only a few, so the source line stays compact inside the block
+    var seenH={},czu=[];cz.forEach(function(c){var h=groundHost(c.url)||c.url;if(!seenH[h]){seenH[h]=1;czu.push(c);}});
+    if(!ans&&!czu.length)return '';
     var n=0;
-    var srcs=cz.length?'<div class="xr-secsrc"><span class="xr-secsrck">Sources</span>'+cz.slice(0,5).map(function(c){return groundCite(c,++n);}).join('')+'</div>':'';
-    return '<div class="xr-genrich"><div class="xr-genrich-h"><span class="xr-gdot"></span>'+esc2(g.label||'Web-grounded context')+'</div>'+
-      (hasA?'<div class="xr-groundt">'+mdLite(g.answer)+'</div>':'')+srcs+'</div>';
+    var srcs=czu.length?'<div class="xr-secsrc"><span class="xr-secsrck">Sources</span>'+czu.slice(0,4).map(function(c){return groundCite(c,++n);}).join('')+'</div>':'';
+    return '<div class="xr-woven"><div class="xr-wtag"><span class="xr-gdot"></span>Live web context \u00b7 verify sources</div>'+
+      (ans?'<div class="xr-groundt">'+mdLite(ans)+'</div>':'')+srcs+'</div>';
   }
   function groundSlot(key){return '<div class="xr-gslot" id="xr-g-'+key+'">'+groundEnrich(key)+'</div>';}
   function refreshGround(key){var el=document.getElementById('xr-g-'+key);if(el)el.innerHTML=groundEnrich(key);}
@@ -2182,8 +2193,8 @@ const REPORT = {
         '</div></div>'+
 
       '<div class="xr-section"><div class="xr-sh"><span class="xr-num">02</span>Executive summary</div>'+
-        '<p class="xr-sint">'+summary+'</p>'+
-        '<div class="xr-kpis">'+kpis+'</div>'+groundSlot('summary')+'</div>'+
+        '<p class="xr-sint">'+summary+'</p>'+groundSlot('summary')+
+        '<div class="xr-kpis">'+kpis+'</div></div>'+
 
       '<div class="xr-section"><div class="xr-sh"><span class="xr-num">03</span>Risk heatmap</div>'+
         '<p class="xr-sint">Each technique placed by <b>impact</b> (severity) against <b>likelihood</b> (how reliably it worked). The top-right, in red, is where real risk concentrates.</p>'+
@@ -2194,10 +2205,10 @@ const REPORT = {
         '<div class="xr-remwrap">'+xrRemCard()+'</div></div>'+
 
       '<div class="xr-section"><div class="xr-sh"><span class="xr-num">05</span>Reconnaissance: what we learned</div>'+
-        '<p class="xr-sint">Before attacking, the agents mapped the target. These steps gather information and are not attacks themselves.</p>'+reconHtml+groundSlot('recon')+'</div>'+
+        '<p class="xr-sint">Before attacking, the agents mapped the target. These steps gather information and are not attacks themselves.</p>'+groundSlot('recon')+reconHtml+'</div>'+
 
       '<div class="xr-section"><div class="xr-sh"><span class="xr-num">06</span>Key findings</div>'+
-        '<p class="xr-sint">Weaknesses that the attackers successfully exploited, ordered by severity.</p>'+findTable+groundSlot('findings')+'</div>'+
+        '<p class="xr-sint">Weaknesses that the attackers successfully exploited, ordered by severity.</p>'+groundSlot('findings')+findTable+'</div>'+
 
       '<div class="xr-section"><div class="xr-sh"><span class="xr-num">07</span>Every technique we ran</div>'+
         '<p class="xr-sint">The full catalogue executed in this run, grouped by layer, with each outcome stated honestly.</p>'+techHtml+'</div>'+
@@ -2206,12 +2217,12 @@ const REPORT = {
         '<p class="xr-sint">Captured exchanges behind the confirmed findings. Every leaked value is synthetic.</p>'+evidenceHtml+'</div>'+
 
       '<div class="xr-section"><div class="xr-sh"><span class="xr-num">09</span>How the attack unfolded</div>'+
-        '<p class="xr-sint">Each step is minor on its own; read in order, they form one complete breach.</p>'+chainHtml+groundSlot('chain')+'</div>'+
+        '<p class="xr-sint">Each step is minor on its own; read in order, they form one complete breach.</p>'+groundSlot('chain')+chainHtml+'</div>'+
 
       '<div class="xr-section"><div class="xr-sh"><span class="xr-num">10</span>What to fix first</div>'+
-        '<p class="xr-sint">'+esc2((R.fixes&&R.fixes.intro)||'Prioritised actions. P1 breaks the attack chain, P2 closes remaining gaps.')+'</p>'+fixesHtml+
+        '<p class="xr-sint">'+esc2((R.fixes&&R.fixes.intro)||'Prioritised actions. P1 breaks the attack chain, P2 closes remaining gaps.')+'</p>'+groundSlot('fix')+fixesHtml+
         (lvHtml?'<div class="xr-subh">'+esc2((lv&&lv.title)||'Then prove the fixes work')+'</div><p class="xr-sint">'+esc2((lv&&lv.intro)||'')+'</p><div class="xr-levels">'+lvHtml+'</div>':'')+
-        groundSlot('fix')+'</div>'+
+        '</div>'+
 
       '<div class="xr-foot">Scored against MITRE ATLAS and the OWASP GenAI Top 10, with severity following the Microsoft MSRC AI bug bar. '+
         'This report was generated automatically by '+esc2(brand)+' from the run trace. Findings marked Confirmed carry deterministic evidence; '+

@@ -46,9 +46,17 @@ from .logbus import BUS
 log = logging.getLogger("trident.web")
 
 _ROOT = Path(__file__).resolve().parents[2]
-# Repo layout: <repo>/backend/src/web/server.py and <repo>/frontend/frontend.html.
+# Repo layout: <repo>/backend/src/web/server.py and <repo>/frontend/index.html.
 # _ROOT is the backend/ dir; the UI lives in the sibling frontend/ folder.
-_DEFAULT_FRONTEND = _ROOT.parent / "frontend" / "frontend.html"
+# index.html is the canonical single-page app (newest feature set: dashboard +
+# per-section web grounding). frontend.html is a legacy snapshot kept only as a
+# fallback; prefer index.html so we serve the file the UI is actually developed in.
+_FRONTEND_DIR = _ROOT.parent / "frontend"
+_DEFAULT_FRONTEND = (
+    _FRONTEND_DIR / "index.html"
+    if (_FRONTEND_DIR / "index.html").exists()
+    else _FRONTEND_DIR / "frontend.html"
+)
 _MAX_BODY = 1 * 1024 * 1024  # 1 MiB cap on request bodies
 
 
