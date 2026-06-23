@@ -3039,7 +3039,7 @@ const REPORT = {
     },550);
 
     function renderTurn(resp){
-      if(resp&&resp.kind==='clarify'&&resp.questions&&resp.questions.length&&(PLAN.clarifies||0)<3){
+      if(resp&&resp.kind==='clarify'&&resp.questions&&resp.questions.length){
         PLAN.history.push({role:'assistant',content:resp.questions.join(' ')});
         PLAN.clarifies=(PLAN.clarifies||0)+1;
         say('<div class="ac-think" style="margin-bottom:7px">A couple of quick questions so I scope the right package:</div>'+
@@ -3060,7 +3060,7 @@ const REPORT = {
     window.__TRIDENT_planAnswer=function(text){
       if(!PLAN)return;PLAN.awaiting=false;setHint(false);
       userSay(text);
-      var ans=text;if((PLAN.clarifies||0)>=2)ans+='. That is enough detail; propose the best packages now, do not ask more questions.';
+      var ans=text;
       PLAN.history.push({role:'user',content:ans});
       say('<span class="ac-think">Got it \u2014 refining the scope\u2026</span>');
       var resp=null,err=false;
