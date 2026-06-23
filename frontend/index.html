@@ -910,6 +910,12 @@
   .xr-kpi span{display:block;font-size:11.5px;color:#6b6b73;margin-top:6px;font-weight:600}
   .xr-charts{display:grid;grid-template-columns:170px 1fr;gap:20px;align-items:center;margin-top:6px}
   .xr-chartbox{border:1px solid rgba(0,0,0,.1);border-radius:10px;padding:14px 16px;background:#f7f7f9}
+  .xr-jump{cursor:pointer;transition:box-shadow .15s,transform .15s}
+  .xr-jump:hover{box-shadow:0 0 0 2px rgba(225,29,42,.35);transform:translateY(-1px)}
+  .xr-jump:focus-visible{outline:none;box-shadow:0 0 0 2px rgba(225,29,42,.55)}
+  .xr-jhint{margin-top:12px;font-size:10.5px;font-weight:700;letter-spacing:.05em;color:#b23b42;text-transform:uppercase}
+  @keyframes xrflash{0%{box-shadow:0 0 0 0 rgba(225,29,42,.5)}100%{box-shadow:0 0 0 7px rgba(225,29,42,0)}}
+  .xr-flash{animation:xrflash 1.1s ease-out}
   .xr-chartbox .ct{font-size:12px;font-weight:700;color:#52525b;margin-bottom:8px}
   .xr-chartstack{display:grid;gap:14px}
   table.xr-tbl{width:100%;border-collapse:collapse;font-size:13px}
@@ -2200,16 +2206,16 @@ const REPORT = {
 
       '<div class="xr-section"><div class="xr-sh"><span class="xr-num">03</span>Risk heatmap</div>'+
         '<p class="xr-sint">Each technique placed by <b>impact</b> (severity) against <b>likelihood</b> (how reliably it worked). The top-right, in red, is where real risk concentrates.</p>'+
-        '<div class="xr-chartbox" style="text-align:center">'+xrHeatmap()+'</div></div>'+
+        '<div class="xr-jump" role="link" tabindex="0" title="Go to Key findings" onclick="window.TRIDENT_xrJump&&window.TRIDENT_xrJump(\'xr-sec-key\')" onkeydown="if((event.key===\'Enter\'||event.key===\' \')&&window.TRIDENT_xrJump){event.preventDefault();window.TRIDENT_xrJump(\'xr-sec-key\');}"><div class="xr-chartbox" style="text-align:center">'+xrHeatmap()+'</div><div class="xr-jhint" style="text-align:center">Click to see the findings behind this &rarr;</div></div></div>'+
 
       '<div class="xr-section"><div class="xr-sh"><span class="xr-num">04</span>Mitigations</div>'+
         '<p class="xr-sint">How many fixes we recommend to close the gaps found in this campaign.</p>'+
-        '<div class="xr-remwrap">'+xrRemCard()+'</div></div>'+
+        '<div class="xr-remwrap xr-jump" role="link" tabindex="0" title="Go to What to fix first" onclick="window.TRIDENT_xrJump&&window.TRIDENT_xrJump(\'xr-sec-fix\')" onkeydown="if((event.key===\'Enter\'||event.key===\' \')&&window.TRIDENT_xrJump){event.preventDefault();window.TRIDENT_xrJump(\'xr-sec-fix\');}">'+xrRemCard()+'<div class="xr-jhint" style="text-align:center">Click to see what to fix first &rarr;</div></div></div>'+
 
       '<div class="xr-section"><div class="xr-sh"><span class="xr-num">05</span>Reconnaissance: what we learned</div>'+
         '<p class="xr-sint">Before attacking, the agents mapped the target. These steps gather information and are not attacks themselves.</p>'+groundSlot('recon')+reconHtml+'</div>'+
 
-      '<div class="xr-section"><div class="xr-sh"><span class="xr-num">06</span>Key findings</div>'+
+      '<div class="xr-section" id="xr-sec-key"><div class="xr-sh"><span class="xr-num">06</span>Key findings</div>'+
         '<p class="xr-sint">Only the techniques that worked &mdash; those marked <b>Succeeded</b> or <b>Confirmed</b> &mdash; ordered by severity. Attempts that <b>Failed</b> or were <b>Blocked</b> are not shown here; they appear in &ldquo;Every technique we ran&rdquo; below.</p>'+groundSlot('findings')+findTable+'</div>'+
 
       '<div class="xr-section"><div class="xr-sh"><span class="xr-num">07</span>Every technique we ran</div>'+
@@ -2221,7 +2227,7 @@ const REPORT = {
       '<div class="xr-section"><div class="xr-sh"><span class="xr-num">09</span>How the attack unfolded</div>'+
         '<p class="xr-sint">Each step is minor on its own; read in order, they form one complete breach.</p>'+groundSlot('chain')+chainHtml+'</div>'+
 
-      '<div class="xr-section"><div class="xr-sh"><span class="xr-num">10</span>What to fix first</div>'+
+      '<div class="xr-section" id="xr-sec-fix"><div class="xr-sh"><span class="xr-num">10</span>What to fix first</div>'+
         '<p class="xr-sint">'+esc2((R.fixes&&R.fixes.intro)||'Prioritised actions. P1 breaks the attack chain, P2 closes remaining gaps.')+'</p>'+groundSlot('fix')+fixesHtml+
         '</div>'+
 
@@ -2242,6 +2248,14 @@ const REPORT = {
     document.getElementById('xr-download').onclick=function(){downloadReport();};
     document.getElementById('exportReport').scrollTop=0;
   }
+
+  // Smooth-scroll within the export overlay when a section (heatmap / mitigations) is clicked.
+  window.TRIDENT_xrJump=function(id){
+    var el=document.getElementById(id);if(!el)return;
+    el.scrollIntoView({behavior:'smooth',block:'start'});
+    el.classList.remove('xr-flash');void el.offsetWidth;el.classList.add('xr-flash');
+    setTimeout(function(){el.classList.remove('xr-flash');},1200);
+  };
 
   function printExport(){
     document.body.classList.add('printing');
