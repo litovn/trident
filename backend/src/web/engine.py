@@ -538,9 +538,20 @@ _PKG_STOP = frozenset({
     "the", "and", "for", "with", "that", "this", "your", "you", "are", "our", "all",
     "can", "run", "test", "just", "want", "into", "from", "like", "real", "only",
     "any", "out", "get", "let", "give", "does", "what", "how", "its", "use",
-    "using", "about", "make",
+    "using", "about", "make", "attack", "attacks", "layer", "layers", "target", "targets", "surface",
+    "system", "systems", "where", "here", "there", "chatbot", "bot", "assistant",
+    "underlying", "active", "thing", "stuff",
 })
 _AXIS_PRIOR = {"focus": 0.6, "layer": 0.4, "profile": 0.2}
+_CODE_RE = re.compile(r"\b(?:TRD-[A-Z]{3}-[A-Z0-9]{2,4}|PKG-[A-Z0-9]+)\b", re.IGNORECASE)
+_RECOMMEND_RE = re.compile(
+    r"\b(recommend\w*|suggest\w*|propose|"
+    r"which (?:one|package|attack)|"
+    r"you (?:choose|pick|decide)|(?:pick|choose|decide) for me|"
+    r"help me (?:choose|decide|pick)|(?:show|give) (?:me )?(?:some )?options|"
+    r"what(?:'s| is)\s+(?:the\s+)?best|best (?:option|choice|package|attack)|"
+    r"your call|just (?:pick|choose|propose|go ahead))\b",
+    re.IGNORECASE)
 
 
 def _pkg_words(s: str) -> list[str]:
@@ -591,12 +602,74 @@ def _score_packages(registry: SkillRegistry, query: str, mode: str):
     return out
 
 
-def _default_questions(mode: str) -> list[str]:
-    return [
-        "What is the goal: broad coverage, or a specific objective "
-        "(data exfiltration, jailbreak / guardrail bypass, RAG / tool abuse, model recon)?",
-        "Does the target use retrieval (RAG) or tools / agents, or is it a bare chatbot?",
-    ]
+_SIGNAL_VOCAB_CACHE: dict[tuple[int, str], frozenset[str]] = {}
+
+
+def _signal_vocab(registry: SkillRegistry, mode: str) -> frozenset[str]:
+    key = (id(registry), mode)
+    cached = _SIGNAL_VOCAB_CACHE.get(key)
+    if cached is not None:
+        return cached
+    tokens: set[str] = set()
+    for p in registry.packages.values():
+        if mode not in p.modes:
+            continue
+        for s in (p.name, *p.aliases, *p.intent_examples):
+            tokens.update(_pkg_words(s))
+        for tid in p.techniques:
+            t = registry.techniques.get(tid)
+            if t is None:
+                continue
+            for s in (t.name, *t.aliases, *t.intent_examples):
+                tokens.update(_pkg_words(s))
+    vocab = frozenset(tokens)
+    _SIGNAL_VOCAB_CACHE[key] = vocab
+    return vocab
+
+
+def _specific_signal(registry: SkillRegistry, text: str, mode: str) -> bool:
+    """True when the request names a concrete attack signal: an explicit catalog code,
+    or a word that maps to a package/technique objective, layer, or profile. Generic
+    scoping words ("attack", "layer", "target", ...) are dropped by ``_pkg_words`` and
+    so never qualify — which is what keeps vague prompts on the clarifying-question path
+    instead of the propose path."""
+    t = text or ""
+    if _CODE_RE.search(t):
+        return True
+    return not set(_pkg_words(t)).isdisjoint(_signal_vocab(registry, mode))
+
+
+def _wants_recommendation(text: str) -> bool:
+    """True when the operator explicitly hands us the choice ("recommend", "suggest",
+    "you pick", "which package", "what's best", ...). Treating that as a propose
+    trigger is *helping them choose*, not forcing — so we may propose even without a
+    named attack."""
+    return bool(_RECOMMEND_RE.search(text or ""))
+
+
+_CLARIFY_ROUNDS: list[list[str]] = [
+    ["What are you trying to achieve — broad coverage, or a specific objective "
+     "(data exfiltration, jailbreak / guardrail bypass, RAG / tool abuse, model recon)?"],
+    ["Tell me about the target: does it use retrieval (RAG) or tools / agents, or is it "
+     "a bare chatbot?",
+     "And should this be recon-only, or an active attack?"],
+    ["Which surface is most interesting — the prompt (the input itself), the application "
+     "(RAG, tools, output handling), or the underlying model?",
+     "Or I can start from a ready profile — Quick scan, OWASP sweep, or ATLAS kill-chain. "
+     "Want one of those?"],
+    ["What kind of system is it (support bot, coding assistant, tool-using agent, ...), "
+     "and what would a worst-case outcome look like for it?",
+     "Tell me your top concern and I'll line up the best-matching packages — or just say "
+     '"recommend" and I\'ll suggest a starting point.'],
+]
+
+
+def _clarify_questions(mode: str, rounds: int = 0) -> list[str]:
+    """Clarifying questions for this turn. ``rounds`` is how many times we have already
+    asked, so the conversation progresses instead of repeating; past the last set we
+    keep offering to recommend rather than forcing a choice."""
+    idx = min(max(rounds, 0), len(_CLARIFY_ROUNDS) - 1)
+    return list(_CLARIFY_ROUNDS[idx])
 
 
 def _offline_rationale(pkg) -> str:
@@ -609,13 +682,13 @@ def _offline_plan(history: list[dict], mode: str, top_n: int) -> dict[str, Any]:
     registry = get_registry()
     user_msgs = [m for m in history if (m or {}).get("role") == "user"]
     combined = " ".join((m.get("content") or "") for m in user_msgs)
+    last_user = (user_msgs[-1].get("content") or "") if user_msgs else ""
+    rounds = sum(1 for m in history if (m or {}).get("role") == "assistant")
     scored = _score_packages(registry, combined, mode)
-    best_kw = scored[0][2] if scored else 0.0
-    # Clarify on the opening turn when there is no usable signal (mirrors the
-    # advisor's "ask when vague" rule and the frontend's own no-signal threshold).
-    if not scored or (len(user_msgs) <= 1 and best_kw <= 0):
+    concrete = _specific_signal(registry, combined, mode) or _wants_recommendation(last_user)
+    if not scored or not concrete:
         return {"kind": "clarify", "engine": "advisor-offline",
-                "questions": _default_questions(mode), "candidates": []}
+                "questions": _clarify_questions(mode, rounds), "candidates": []}
     cands = []
     for pkg, prior, kw in scored[:top_n]:
         score = prior + kw
@@ -644,24 +717,36 @@ def _candidate_payload(c: Any) -> dict[str, Any]:
 
 
 def plan(history: list[dict], mode: str = "attack", top_n: int = 4) -> dict[str, Any]:
-    """One advisor turn: propose the top packages, or ask clarifying questions when
-    the request is vague. Uses the real ``PackageAdvisor`` (one Foundry LLM call)
-    when Foundry is configured, else the deterministic offline mirror above."""
+    """One advisor turn in an open-ended, helpful conversation to co-decide the attack
+    package. Ask guiding questions while the request is still open-ended; propose the
+    top packages only once the operator names a concrete objective / technique / layer /
+    profile / code, or explicitly asks us to recommend. There is no fixed number of
+    clarifying rounds and a proposal is never forced.
+
+    Uses the real ``PackageAdvisor`` (one Foundry LLM call) when Foundry is configured,
+    else the deterministic offline mirror above."""
     mode = mode if mode in ("recon", "attack") else "attack"
     history = [m for m in (history or []) if isinstance(m, dict)]
     if not history:
         return {"kind": "clarify", "engine": "advisor-offline",
-                "questions": _default_questions(mode), "candidates": []}
+                "questions": _clarify_questions(mode, 0), "candidates": []}
+    registry = get_registry()
+    combined = " ".join((m.get("content") or "") for m in history if m.get("role") == "user")
+    last_user = next((m.get("content") or "" for m in reversed(history)
+                      if m.get("role") == "user"), "")
+    rounds = sum(1 for m in history if m.get("role") == "assistant")
+    concrete = _specific_signal(registry, combined, mode) or _wants_recommendation(last_user)
     if os.environ.get("FOUNDRY_ENDPOINT") or os.environ.get("AZURE_OPENAI_ENDPOINT"):
         try:
             from ..nl.advisor import PackageAdvisor
-            advisor = PackageAdvisor(get_registry(), mode, top_n=top_n)  # type: ignore[arg-type]
+            advisor = PackageAdvisor(registry, mode, top_n=top_n)  # type: ignore[arg-type]
             turn = advisor.step(list(history))
-            if turn.kind == "propose" and turn.candidates:
+            if turn.kind == "propose" and turn.candidates and concrete:
                 return {"kind": "propose", "engine": "advisor-llm", "questions": [],
                         "candidates": [_candidate_payload(c) for c in turn.candidates]}
+            questions = list(turn.questions) or _clarify_questions(mode, rounds)
             return {"kind": "clarify", "engine": "advisor-llm",
-                    "questions": list(turn.questions), "candidates": []}
+                    "questions": questions, "candidates": []}
         except Exception as exc:                       # advisor is best-effort
             log.warning("real advisor unavailable (%s) — using offline advisor", exc)
     return _offline_plan(history, mode, top_n)

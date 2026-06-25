@@ -192,6 +192,9 @@
     .sidebar{position:absolute;z-index:30;height:100%;box-shadow:var(--ring)}
     body:not(.collapsed) .scrim{position:absolute;inset:0;background:rgba(0,0,0,.35);z-index:20}
     body.collapsed .sidebar{width:60px}
+    /* keep the composer clear of the collapsed sidebar rail so the text box is never hidden behind it */
+    body.collapsed .composer-wrap{padding-left:84px}
+    body.collapsed.chat-on .composer-wrap{left:60px;padding-left:24px}
   }
 
   @keyframes glowpulse{0%,100%{opacity:.8}50%{opacity:1}}
@@ -236,20 +239,20 @@
     font-family:"universalSans",Inter,system-ui,sans-serif}
   #scan.on,#remed.on{display:block}
   #dboard.on{display:grid;grid-template-rows:auto 1fr}
-  .db-top{display:flex;align-items:center;gap:14px;height:56px;padding:0 22px;border-bottom:1px solid rgba(255,255,255,.08)}
+  .db-top{display:flex;align-items:center;gap:14px;min-height:56px;padding:8px 22px;border-bottom:1px solid rgba(255,255,255,.08);flex-wrap:wrap;row-gap:8px}
   .db-top .lg{display:flex;align-items:center;gap:10px;cursor:pointer;transition:opacity .15s,transform .15s}
   .db-top .lg:hover{opacity:.82;transform:translateY(-1px)}
   .db-top .lg:active{transform:translateY(0)}
   .db-top .lg img{width:auto;height:26px;object-fit:contain;filter:drop-shadow(0 0 6px rgba(225,29,42,.5))}
   .db-top .lg b{font-family:'Newsreader',Georgia,serif;font-weight:600;font-size:20px}
   .db-top .tag{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:#e11d2a;letter-spacing:.12em;text-transform:uppercase;padding:3px 9px;border:1px solid rgba(225,29,42,.4);border-radius:6px}
-  .db-top .rid{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:#76767d}
+  .db-top .rid{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:#76767d;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .db-top .sp{flex:1}
-  .db-top .db-acts{display:flex;align-items:center;gap:8px}
-  .db-top .db-nav{display:flex;align-items:center;gap:8px}
+  .db-top .db-acts{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  .db-top .db-nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .db-btn.newscan{background:#f4f4f5;border-color:transparent;color:#15151a;font-weight:700}
   .db-btn.newscan:hover{background:#fff}
-  .db-btn{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 15px;border-radius:9px;font-size:13.5px;font-weight:600;color:#f4f4f5;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.02);cursor:pointer}
+  .db-btn{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 15px;border-radius:9px;font-size:13.5px;font-weight:600;color:#f4f4f5;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.02);cursor:pointer;white-space:nowrap;flex-shrink:0}
   .db-btn:hover{background:rgba(255,255,255,.07)}
   .db-btn.red{background:#e11d2a;border-color:transparent;color:#fff}
   .db-btn.red:hover{background:#f02534}
@@ -718,6 +721,8 @@
   .rc-hitl .htxt span{display:block;font-size:12.5px;color:#9a9aa3;margin-top:3px;line-height:1.4}
   .rc-go{display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 22px;border-radius:11px;font-size:14px;font-weight:700;color:#04141a;background:#36d1e0;border:none;cursor:pointer;box-shadow:0 0 18px rgba(54,209,224,.5);white-space:nowrap}
   .rc-go:hover{background:#5ee0ee}
+  .rc-go:disabled{opacity:.4;cursor:not-allowed;box-shadow:none;filter:grayscale(.4)}
+  .rc-go:disabled:hover{background:#36d1e0}
   /* recon-mode recommended packages (top 4, collapsed) */
   .rc-opts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px;align-items:stretch}
   .rc-opts .rc-opt{display:flex;flex-direction:column}
@@ -877,7 +882,7 @@
   .xr-top .lg img{width:auto;height:26px;object-fit:contain;filter:drop-shadow(0 0 6px rgba(225,29,42,.5))}
   .xr-top .xr-rid{font-size:12px;color:#82828c;font-family:ui-monospace,monospace}
   .xr-top .sp{flex:1}
-  .xr-btn{cursor:pointer;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:#f4f4f5;font:inherit;font-size:13px;font-weight:600;padding:8px 15px;border-radius:8px;transition:.15s}
+  .xr-btn{cursor:pointer;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:#f4f4f5;font:inherit;font-size:13px;font-weight:600;padding:8px 15px;border-radius:8px;transition:.15s;white-space:nowrap;flex-shrink:0}
   .xr-btn:hover{background:rgba(255,255,255,.1)}
   .xr-btn.primary{background:#e11d2a;border-color:transparent;color:#fff}
   .xr-btn.primary:hover{background:#f02534}
@@ -907,6 +912,12 @@
   .xr-kpi span{display:block;font-size:11.5px;color:#6b6b73;margin-top:6px;font-weight:600}
   .xr-charts{display:grid;grid-template-columns:170px 1fr;gap:20px;align-items:center;margin-top:6px}
   .xr-chartbox{border:1px solid rgba(0,0,0,.1);border-radius:10px;padding:14px 16px;background:#f7f7f9}
+  .xr-jump{cursor:pointer;transition:box-shadow .15s,transform .15s}
+  .xr-jump:hover{box-shadow:0 0 0 2px rgba(225,29,42,.35);transform:translateY(-1px)}
+  .xr-jump:focus-visible{outline:none;box-shadow:0 0 0 2px rgba(225,29,42,.55)}
+  .xr-jhint{margin-top:12px;font-size:10.5px;font-weight:700;letter-spacing:.05em;color:#b23b42;text-transform:uppercase}
+  @keyframes xrflash{0%{box-shadow:0 0 0 0 rgba(225,29,42,.5)}100%{box-shadow:0 0 0 7px rgba(225,29,42,0)}}
+  .xr-flash{animation:xrflash 1.1s ease-out}
   .xr-chartbox .ct{font-size:12px;font-weight:700;color:#52525b;margin-bottom:8px}
   .xr-chartstack{display:grid;gap:14px}
   table.xr-tbl{width:100%;border-collapse:collapse;font-size:13px}
@@ -962,12 +973,15 @@
   .xr-gq{font-weight:400;text-transform:none;letter-spacing:0;color:#9a9aa3;font-size:11px}
   .xr-ground.pending{background:#fafafa}
   .xr-gslot:empty{display:none}
-  .xr-genrich{margin-top:13px;padding:11px 13px;border:1px solid rgba(0,0,0,.1);border-left:3px solid #2f6db0;border-radius:9px;background:#f5f8fb}
-  .xr-genrich.loading{display:flex;align-items:center;gap:9px;color:#6b6b73;font-size:12px;font-style:italic;background:#fafafa;border-left-color:#c9c9d1}
-  .xr-genrich-h{display:flex;align-items:center;gap:7px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#2f6db0;margin-bottom:6px}
-  .xr-gdot{width:7px;height:7px;border-radius:50%;background:#2f6db0;flex:none}
-  .xr-genrich .xr-groundt{font-size:12.5px;color:#33333a}
-  .xr-genrich .xr-secsrc{margin-top:9px;padding-top:8px}
+  /* woven web-grounded enrichment: reads as part of the section narrative, not a separate card */
+  .xr-woven{margin:9px 0 2px;padding-left:12px;border-left:2px solid #d4dde7}
+  .xr-woven.loading{display:flex;align-items:center;gap:9px;color:#6b6b73;font-size:12px;font-style:italic;border-left-color:#e4e4ea;padding:2px 0 2px 12px}
+  .xr-wtag{display:flex;align-items:center;gap:6px;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#9aa3ad;margin-bottom:5px}
+  .xr-gdot{width:6px;height:6px;border-radius:50%;background:#5a8fc0;flex:none}
+  .xr-woven .xr-groundt{font-size:12.5px;color:#2c2c33;line-height:1.55}
+  .xr-woven .xr-secsrc{margin-top:16px;padding-top:12px}
+  /* a little extra breathing room below the woven block in the denser sections (02/06/09/10) */
+  #xr-g-summary,#xr-g-findings,#xr-g-chain,#xr-g-fix{margin-bottom:16px}
   .xr-gspin{width:12px;height:12px;border:2px solid rgba(0,0,0,.15);border-top-color:#2f6db0;border-radius:50%;display:inline-block;animation:xrspin .8s linear infinite}
   @keyframes xrspin{to{transform:rotate(360deg)}}
   .xr-foot{margin-top:34px;padding-top:16px;border-top:1px solid rgba(0,0,0,.1);font-size:11px;color:#8a8a92;line-height:1.6}
@@ -1009,7 +1023,14 @@
   @media(max-width:720px){.xr-kpis{grid-template-columns:repeat(2,1fr)}.xr-charts{grid-template-columns:1fr}.xr-gloss{grid-template-columns:1fr}.xr-page{padding:28px 22px}}
   @media print{
     @page{size:A4;margin:13mm}
-    html,body{background:#ffffff!important}
+    /* The app body is normally clamped to one viewport (height:100vh; overflow:hidden);
+       reset that for print so a long report flows across pages instead of clipping to page 1. */
+    html,body{background:#ffffff!important;height:auto!important;min-height:0!important;overflow:visible!important}
+    /* Decorative fixed layers (red glow / grid / matrix) must not print: a position:fixed
+       element with filter:blur rasterises as an opaque white box over the first page in PDFs. */
+    body::before,body::after{display:none!important;content:none!important}
+    #matrix{display:none!important}
+    body.printing{display:block!important}
     body.printing>*{display:none!important}
     body.printing #exportReport{display:block!important;position:static!important;inset:auto!important;overflow:visible!important;background:#ffffff!important;height:auto!important}
     .xr-top,.no-print{display:none!important}
@@ -1959,12 +1980,18 @@ const REPORT = {
     var winNames=wins.slice(0,3).map(function(t){return t.what;}).filter(Boolean);
     var reconNames=T.filter(function(t){return /recon/i.test(t.what||'');}).slice(0,3).map(function(t){return (t.what||'').replace(/\s*\(recon\)/i,'');}).filter(Boolean);
     var chainTitles=((R&&R.chain&&R.chain.steps)||[]).slice(0,4).map(function(s){return s.title;}).filter(Boolean);
+    // Shared style contract: keep answers short and woven-ready (no headings/bullets), but ASK for
+    // the source URLs in a trailing "Sources:" line. This deployment has no structured url_citation
+    // annotations, so the backend harvests citations from inline URLs in the text; the frontend
+    // (groundClean) then strips that trailing block from the displayed prose, keeping it clean while
+    // still surfacing the numbered citation markers + chips.
+    var STYLE=' Answer in 2-4 concise, report-ready sentences of plain analytical prose that can be woven directly into a security report; use a neutral third-person tone with no headings, bullet lists, or markdown. After the prose, on a new line write "Sources:" followed by the full URLs of the 2-4 most relevant public sources, one per line.';
     var specs=[];
-    specs.push({key:'summary',label:'Industry context',q:'Executive context on the current AI red-teaming and LLM security threat landscape and benchmarks in 2026, relevant to systems like '+tgt+'.'});
-    if(reconNames.length)specs.push({key:'recon',label:'How attackers profile targets',q:'Open-source intelligence and model-fingerprinting techniques attackers use to profile LLM applications such as '+tgt+': '+reconNames.join('; ')+'.'});
-    if(winNames.length)specs.push({key:'findings',label:'Related public advisories',q:'Public advisories, documented real-world incidents and OWASP/MITRE references for these AI attack techniques: '+winNames.join('; ')+'.'});
-    if(chainTitles.length)specs.push({key:'chain',label:'Real-world attack chains',q:'Documented multi-step attack chains and kill-chains against LLM applications combining steps like: '+chainTitles.join('; ')+'.'});
-    specs.push({key:'fix',label:'Field-tested mitigations',q:winNames.length?'Recommended, field-tested mitigations and defensive controls for these AI attack techniques against '+tgt+': '+winNames.join('; ')+'.':'OWASP LLM Top 10 mitigations and current prompt-injection and jailbreak defenses for '+tgt+'.'});
+    specs.push({key:'summary',label:'Industry context',q:'As of 2026, give brief executive context on the current AI red-teaming and LLM-application security threat landscape relevant to a system like '+tgt+'.'+STYLE});
+    if(reconNames.length)specs.push({key:'recon',label:'How attackers profile targets',q:'Briefly explain the open-source intelligence and model-fingerprinting techniques attackers use to profile LLM applications such as '+tgt+', covering: '+reconNames.join('; ')+'.'+STYLE});
+    if(winNames.length)specs.push({key:'findings',label:'Related public advisories',q:'Briefly describe known public advisories and documented real-world impact, plus the OWASP LLM Top 10 / MITRE ATLAS relevance, for these AI attack techniques: '+winNames.join('; ')+'.'+STYLE});
+    if(chainTitles.length)specs.push({key:'chain',label:'Real-world attack chains',q:'Briefly describe how attackers combine steps like the following into a documented multi-step attack chain against LLM applications: '+chainTitles.join('; ')+'.'+STYLE});
+    specs.push({key:'fix',label:'Field-tested mitigations',q:(winNames.length?'Briefly recommend specific, field-tested mitigations and defensive controls for these AI attack techniques against '+tgt+': '+winNames.join('; ')+'.':'Briefly summarize current best-practice OWASP LLM Top 10 mitigations and prompt-injection and jailbreak defenses relevant to '+tgt+'.')+STYLE});
     return specs;
   }
   function startGrounding(){
@@ -1989,20 +2016,27 @@ const REPORT = {
     var u=c.url||'';var t=xrStrip(c.title||groundHost(u)||'source');var h=groundHost(u);
     return '<a class="xr-cite" href="'+u.replace(/"/g,'%22')+'" target="_blank" rel="noopener noreferrer"><span class="xr-cn">'+n+'</span><span class="xr-ct">'+esc2(t)+'</span>'+(h?'<span class="xr-cd">'+esc2(h)+'</span>':'')+'</a>';
   }
-  // grounded enrichment for ONE section, from that section's own web query
+  // strip a trailing "References:/Sources:" block some deployments append inline, so the
+  // woven prose never duplicates the citation chips we render separately from g.citations.
+  function groundClean(s){
+    return String(s||'').replace(/\n+\s*(references|sources|citations)\s*:[\s\S]*$/i,'').replace(/\n{3,}/g,'\n\n').trim();
+  }
+  // grounded enrichment for ONE section: woven into the section narrative (not a separate card)
   function groundEnrich(key){
     var g=(R&&R._ground&&R._ground[key])||null;
     if(!g)return '';
     if(g.status==='loading'||g.status==='idle')
-      return '<div class="xr-genrich loading"><span class="xr-gspin"></span>Grounding this section with live public-web intelligence\u2026</div>';
+      return '<div class="xr-woven loading"><span class="xr-gspin"></span>adding live web context\u2026</div>';
     if(g.status!=='ok')return '';
+    var ans=groundClean(g.answer);
     var cz=(g.citations||[]).filter(function(c){return c&&c.url;});
-    var hasA=!!(g.answer&&g.answer.trim());
-    if(!hasA&&!cz.length)return '';
-    var n=0;
-    var srcs=cz.length?'<div class="xr-secsrc"><span class="xr-secsrck">Sources</span>'+cz.slice(0,5).map(function(c){return groundCite(c,++n);}).join('')+'</div>':'';
-    return '<div class="xr-genrich"><div class="xr-genrich-h"><span class="xr-gdot"></span>'+esc2(g.label||'Web-grounded context')+'</div>'+
-      (hasA?'<div class="xr-groundt">'+mdLite(g.answer)+'</div>':'')+srcs+'</div>';
+    // dedupe by host and keep only a few, so the source line stays compact inside the block
+    var seenH={},czu=[];cz.forEach(function(c){var h=groundHost(c.url)||c.url;if(!seenH[h]){seenH[h]=1;czu.push(c);}});
+    if(!ans&&!czu.length)return '';
+    var shown=czu.slice(0,4);
+    var prose=ans?'<div class="xr-groundt">'+mdLite(ans)+'</div>':'';
+    var srcs=shown.length?'<div class="xr-secsrc"><span class="xr-secsrck">Sources</span>'+shown.map(function(c,i){return groundCite(c,i+1);}).join('')+'</div>':'';
+    return '<div class="xr-woven"><div class="xr-wtag"><span class="xr-gdot"></span>Live web context \u00b7 verify sources</div>'+prose+srcs+'</div>';
   }
   function groundSlot(key){return '<div class="xr-gslot" id="xr-g-'+key+'">'+groundEnrich(key)+'</div>';}
   function refreshGround(key){var el=document.getElementById('xr-g-'+key);if(el)el.innerHTML=groundEnrich(key);}
@@ -2086,7 +2120,7 @@ const REPORT = {
       ? '<div class="xr-chain">'+steps+'</div>'+(R.chain&&R.chain.outcome?'<div class="xr-outcome">'+R.chain.outcome+'</div>':'')
       : '<div class="xr-sint">No multi-step attack chain was completed.</div>';
 
-    var fxRows=((R.fixes&&R.fixes.rows)||[]).slice().sort(function(a,b){return (/1/.test(a.priority)?0:1)-(/1/.test(b.priority)?0:1);}).slice(0,4);
+    var fxRows=((R.fixes&&R.fixes.rows)||[]).slice().sort(function(a,b){return (/1/.test(a.priority)?0:1)-(/1/.test(b.priority)?0:1);});
     var fx=fxRows.map(function(f){
       var pc=/1/.test(f.priority)?'#e0484f':'#d99a55';
       var ctrls=(f.controls||[]).map(function(c){return '<span class="xr-ctrl">'+esc2(c)+'</span>';}).join('');
@@ -2148,12 +2182,6 @@ const REPORT = {
     }).join('');
     var evidenceHtml=evHtml||'<div class="xr-sint">No captured exchanges available for this run.</div>';
 
-    var lv=(R.fixes&&R.fixes.levels)||null;
-    var lvHtml=lv&&lv.rows?lv.rows.map(function(l){
-      return '<div class="xr-lvl'+(l.current?' cur':'')+'"><div class="xr-lvi">'+esc2(l.id)+(l.current?' <span class="xr-now">THIS RUN</span>':'')+'</div>'+
-        '<div class="xr-lve">'+esc2(l.ex||'')+'</div><div class="xr-lvp">'+(l.pj||'')+'</div></div>';
-    }).join(''):'';
-
     var trHtml=(R.trace||[]).map(function(r){
       var kc={dispatch:'#9b8cbb',gate:'#5fb0c4',exec:'#c2879f'}[r.kind]||'#8d98a6';
       return '<div class="xr-trow"><span class="xr-tt">'+esc2(r.t||'')+'</span><span class="xr-tk" style="color:'+kc+'">'+esc2(r.kind||'')+'</span><span class="xr-tm">'+esc2(xrStrip(r.msg||''))+'</span></div>';
@@ -2182,22 +2210,22 @@ const REPORT = {
         '</div></div>'+
 
       '<div class="xr-section"><div class="xr-sh"><span class="xr-num">02</span>Executive summary</div>'+
-        '<p class="xr-sint">'+summary+'</p>'+
-        '<div class="xr-kpis">'+kpis+'</div>'+groundSlot('summary')+'</div>'+
+        '<p class="xr-sint">'+summary+'</p>'+groundSlot('summary')+
+        '<div class="xr-kpis">'+kpis+'</div></div>'+
 
       '<div class="xr-section"><div class="xr-sh"><span class="xr-num">03</span>Risk heatmap</div>'+
         '<p class="xr-sint">Each technique placed by <b>impact</b> (severity) against <b>likelihood</b> (how reliably it worked). The top-right, in red, is where real risk concentrates.</p>'+
-        '<div class="xr-chartbox" style="text-align:center">'+xrHeatmap()+'</div></div>'+
+        '<div class="xr-jump" role="link" tabindex="0" title="Go to Key findings" onclick="window.TRIDENT_xrJump&&window.TRIDENT_xrJump(\'xr-sec-key\')" onkeydown="if((event.key===\'Enter\'||event.key===\' \')&&window.TRIDENT_xrJump){event.preventDefault();window.TRIDENT_xrJump(\'xr-sec-key\');}"><div class="xr-chartbox" style="text-align:center">'+xrHeatmap()+'</div><div class="xr-jhint" style="text-align:center">Click to see the findings behind this &rarr;</div></div></div>'+
 
       '<div class="xr-section"><div class="xr-sh"><span class="xr-num">04</span>Mitigations</div>'+
         '<p class="xr-sint">How many fixes we recommend to close the gaps found in this campaign.</p>'+
-        '<div class="xr-remwrap">'+xrRemCard()+'</div></div>'+
+        '<div class="xr-remwrap xr-jump" role="link" tabindex="0" title="Go to What to fix first" onclick="window.TRIDENT_xrJump&&window.TRIDENT_xrJump(\'xr-sec-fix\')" onkeydown="if((event.key===\'Enter\'||event.key===\' \')&&window.TRIDENT_xrJump){event.preventDefault();window.TRIDENT_xrJump(\'xr-sec-fix\');}">'+xrRemCard()+'<div class="xr-jhint" style="text-align:center">Click to see what to fix first &rarr;</div></div></div>'+
 
       '<div class="xr-section"><div class="xr-sh"><span class="xr-num">05</span>Reconnaissance: what we learned</div>'+
-        '<p class="xr-sint">Before attacking, the agents mapped the target. These steps gather information and are not attacks themselves.</p>'+reconHtml+groundSlot('recon')+'</div>'+
+        '<p class="xr-sint">Before attacking, the agents mapped the target. These steps gather information and are not attacks themselves.</p>'+groundSlot('recon')+reconHtml+'</div>'+
 
-      '<div class="xr-section"><div class="xr-sh"><span class="xr-num">06</span>Key findings</div>'+
-        '<p class="xr-sint">Weaknesses that the attackers successfully exploited, ordered by severity.</p>'+findTable+groundSlot('findings')+'</div>'+
+      '<div class="xr-section" id="xr-sec-key"><div class="xr-sh"><span class="xr-num">06</span>Key findings</div>'+
+        '<p class="xr-sint">Only the techniques that worked &mdash; those marked <b>Succeeded</b> or <b>Confirmed</b> &mdash; ordered by severity. Attempts that <b>Failed</b> or were <b>Blocked</b> are not shown here; they appear in &ldquo;Every technique we ran&rdquo; below.</p>'+groundSlot('findings')+findTable+'</div>'+
 
       '<div class="xr-section"><div class="xr-sh"><span class="xr-num">07</span>Every technique we ran</div>'+
         '<p class="xr-sint">The full catalogue executed in this run, grouped by layer, with each outcome stated honestly.</p>'+techHtml+'</div>'+
@@ -2206,12 +2234,11 @@ const REPORT = {
         '<p class="xr-sint">Captured exchanges behind the confirmed findings. Every leaked value is synthetic.</p>'+evidenceHtml+'</div>'+
 
       '<div class="xr-section"><div class="xr-sh"><span class="xr-num">09</span>How the attack unfolded</div>'+
-        '<p class="xr-sint">Each step is minor on its own; read in order, they form one complete breach.</p>'+chainHtml+groundSlot('chain')+'</div>'+
+        '<p class="xr-sint">Each step is minor on its own; read in order, they form one complete breach.</p>'+groundSlot('chain')+chainHtml+'</div>'+
 
-      '<div class="xr-section"><div class="xr-sh"><span class="xr-num">10</span>What to fix first</div>'+
-        '<p class="xr-sint">'+esc2((R.fixes&&R.fixes.intro)||'Prioritised actions. P1 breaks the attack chain, P2 closes remaining gaps.')+'</p>'+fixesHtml+
-        (lvHtml?'<div class="xr-subh">'+esc2((lv&&lv.title)||'Then prove the fixes work')+'</div><p class="xr-sint">'+esc2((lv&&lv.intro)||'')+'</p><div class="xr-levels">'+lvHtml+'</div>':'')+
-        groundSlot('fix')+'</div>'+
+      '<div class="xr-section" id="xr-sec-fix"><div class="xr-sh"><span class="xr-num">10</span>What to fix first</div>'+
+        '<p class="xr-sint">'+esc2((R.fixes&&R.fixes.intro)||'Prioritised actions. P1 breaks the attack chain, P2 closes remaining gaps.')+'</p>'+groundSlot('fix')+fixesHtml+
+        '</div>'+
 
       '<div class="xr-foot">Scored against MITRE ATLAS and the OWASP GenAI Top 10, with severity following the Microsoft MSRC AI bug bar. '+
         'This report was generated automatically by '+esc2(brand)+' from the run trace. Findings marked Confirmed carry deterministic evidence; '+
@@ -2229,13 +2256,20 @@ const REPORT = {
     document.getElementById('exportReport').scrollTop=0;
   }
 
+  // Smooth-scroll within the export overlay when a section (heatmap / mitigations) is clicked.
+  window.TRIDENT_xrJump=function(id){
+    var el=document.getElementById(id);if(!el)return;
+    el.scrollIntoView({behavior:'smooth',block:'start'});
+    el.classList.remove('xr-flash');void el.offsetWidth;el.classList.add('xr-flash');
+    setTimeout(function(){el.classList.remove('xr-flash');},1200);
+  };
+
   function printExport(){
     document.body.classList.add('printing');
     var done=function(){document.body.classList.remove('printing');window.removeEventListener('afterprint',done);};
     window.addEventListener('afterprint',done);
     setTimeout(function(){window.print();},60);
   }
-
   // ---------- DASHBOARD ----------
   function buildDash(){
     var v=R.verdict||{}, VC=R.verdictColor||'#9a9aa3';
@@ -2459,17 +2493,11 @@ const REPORT = {
         '<div><span class="pr'+p2+'">'+f.priority+'</span><span class="ft">'+f.title+'</span></div>'+
         '<div class="fw">'+(f.why||'')+'</div>'+(ctrls?'<div class="fc">'+ctrls+'</div>':'')+'</div></div>';
     }).join('');
-    var lv=(F.levels&&F.levels.rows||[]).map(function(l){
-      return '<div class="lvl'+(l.current?' cur':'')+'"><div class="li">'+l.id+(l.current?' <span class="now">THIS RUN</span>':'')+'</div>'+
-        '<div class="le">'+(l.ex||'')+'</div><div class="lp">'+(l.pj||'')+'</div></div>';
-    }).join('');
     document.getElementById('remed').innerHTML=
       topbar('Remediations','<button class="db-btn" id="rm-back">\u2039 Back to report</button>')+
       '<div class="rm-body"><h1 class="rm-h">'+(F.title||'What to fix first')+'</h1>'+
       '<p class="rm-sub">'+(F.intro||'')+'</p>'+
       '<div class="rm-grid">'+fixes+'</div>'+
-      (lv?'<h2 style="font-family:\'Newsreader\',serif;font-size:20px;font-weight:600;margin:34px 0 4px;color:#fff">'+(F.levels.title||'')+'</h2>'+
-          '<p class="rm-sub">'+(F.levels.intro||'')+'</p><div class="rm-levels">'+lv+'</div>':'')+
       '</div>';
     document.getElementById('rm-back').onclick=function(){hide('remed');};
     var rem=document.getElementById('remed');
@@ -2690,7 +2718,10 @@ const REPORT = {
     if(RECON_PLAN&&RECON_PLAN.length){top=RECON_PLAN.map(function(c){var bp=byId(c.id);return bp?{pkg:bp,sim:c.sim||'0.90'}:null;}).filter(Boolean);}
     if(!top||!top.length)top=matchPackagesTop(RECON_PROMPT,4);
     var pkg=top[0].pkg;
-    var selIdx=0;
+    // No package is pre-selected in recon: the operator must explicitly pick one of the
+    // recommended packages before "Authorize & launch" is enabled, so an attack is never
+    // fired against a silent default. The already-launched view keeps idx 0.
+    var selIdx=launched?0:-1;
     // Split each package's techniques: capability-gated ones are auto-skipped on this target.
     var gate={};P.skipped.forEach(function(s){gate[s.id]=s.need;});
     function reconPlanRows(pp){
@@ -2745,8 +2776,8 @@ const REPORT = {
     var hitl = launched
       ? '<div class="rc-hitl launched"><div class="htxt"><b>Attack already launched</b><span>This recon already led to an attack run. Open the attack report to review the results.</span></div>'+
         '<button class="rc-go view" id="rc-go">View launched attack <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>'
-      : '<div class="rc-hitl"><div class="htxt"><b>Human authorization required (HITL)</b><span>Recon does not attack. TRIDENT recommends the <b style="color:#7fe6f2" id="rc-selname">'+esc2(pkg.name)+'</b> package. Authorize to launch it against the target.</span></div>'+
-        '<button class="rc-go" id="rc-go">Authorize &amp; launch attack <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>';
+      : '<div class="rc-hitl"><div class="htxt"><b>Human authorization required (HITL)</b><span>Recon does not attack. Select an attack package above (recommended: <b style="color:#7fe6f2">'+esc2(pkg.name)+'</b>), then authorize to launch it against the target. Selected: <b style="color:#7fe6f2" id="rc-selname">none yet</b></span></div>'+
+        '<button class="rc-go" id="rc-go" disabled>Authorize &amp; launch attack <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>';
     var body='<div class="rc-body"><div class="rc-grid">'+
       '<div class="panel" style="grid-column:1/-1"><div class="ph">Target identity</div><div class="rc-id">'+idrows+'</div></div>'+
       '<div class="panel" style="grid-column:1/-1"><div class="ph">Recon findings \u00b7 no exploits run</div>'+findings+'</div>'+
@@ -2758,8 +2789,9 @@ const REPORT = {
     document.getElementById('rc-back').onclick=function(){hide('recon');if(window.TRIDENT_home)window.TRIDENT_home();};
     (function(){
       var opts=document.querySelectorAll('#recon .rc-opt'),selName=document.getElementById('rc-selname');
+      var goBtn=document.getElementById('rc-go');
       Array.prototype.forEach.call(opts,function(o){
-        o.onclick=function(){Array.prototype.forEach.call(opts,function(x){x.classList.remove('sel');});o.classList.add('sel');selIdx=parseInt(o.getAttribute('data-idx'),10)||0;if(selName)selName.textContent=o.getAttribute('data-name');};
+        o.onclick=function(){Array.prototype.forEach.call(opts,function(x){x.classList.remove('sel');});o.classList.add('sel');selIdx=parseInt(o.getAttribute('data-idx'),10)||0;if(selName)selName.textContent=o.getAttribute('data-name');if(goBtn&&!launched)goBtn.disabled=false;};
         var tg=o.querySelector('[data-act="toggle"]'),det=o.querySelector('.rc-detail');
         if(tg&&det)tg.onclick=function(e){e.stopPropagation();det.classList.toggle('open');tg.textContent=det.classList.contains('open')?'Hide':'Techniques';};
         Array.prototype.forEach.call(o.querySelectorAll('.pk-tx'),function(btn){
@@ -2770,6 +2802,7 @@ const REPORT = {
     })();
     document.getElementById('rc-go').onclick=function(){
       if(launched){ hide('recon'); window.TRIDENT_launch(RECON_PROMPT||'',RECON_TRACE,true,top[selIdx].pkg.techniques); return; }
+      if(selIdx<0)return;   // must explicitly pick an attack package first
       if(window.setTridentMode)window.setTridentMode('attack');
       if(window.__TRIDENT_markAttacked)window.__TRIDENT_markAttacked();
       // Open the chat (not the red terminal scan overlay): the shared live progress
@@ -2990,7 +3023,7 @@ const REPORT = {
     },550);
 
     function renderTurn(resp){
-      if(resp&&resp.kind==='clarify'&&resp.questions&&resp.questions.length&&(PLAN.clarifies||0)<3){
+      if(resp&&resp.kind==='clarify'&&resp.questions&&resp.questions.length){
         PLAN.history.push({role:'assistant',content:resp.questions.join(' ')});
         PLAN.clarifies=(PLAN.clarifies||0)+1;
         say('<div class="ac-think" style="margin-bottom:7px">A couple of quick questions so I scope the right package:</div>'+
@@ -3011,7 +3044,7 @@ const REPORT = {
     window.__TRIDENT_planAnswer=function(text){
       if(!PLAN)return;PLAN.awaiting=false;setHint(false);
       userSay(text);
-      var ans=text;if((PLAN.clarifies||0)>=2)ans+='. That is enough detail; propose the best packages now, do not ask more questions.';
+      var ans=text;
       PLAN.history.push({role:'user',content:ans});
       say('<span class="ac-think">Got it \u2014 refining the scope\u2026</span>');
       var resp=null,err=false;
