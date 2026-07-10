@@ -20,6 +20,10 @@ attack-execution surface, **Azure AI Evaluation** naming for attack strategies, 
 **MSRC AI bug bar** for severity — closing the loop with remediation mapped to Microsoft
 defenses (Content Safety, Foundry guardrails, Azure AI Gateway, Defender for AI).
 
+<p align="center">
+  <img src="assets/trident_pc.png" alt="TRIDENT logo" width="450">
+</p>
+
 ---
 
 ## Table of contents
