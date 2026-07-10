@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/trident_logo.png" alt="TRIDENT logo" width="450">
+  <img src="assets/trident_logo_gray.png" alt="TRIDENT logo" width="450">
 </p>
 
 # TRIDENT
