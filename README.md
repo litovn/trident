@@ -2,7 +2,13 @@
   <img src="assets/trident_logo_gray.png" alt="TRIDENT logo" width="450">
 </p>
 
+<p align="center">
+  <img src="assets/microsoft_logo.png" alt="Microsoft logo" width="100">
+</p>
+
 # TRIDENT
+
+> Project submission for the Microsoft Global Intern Hackathon 2026.
 
 **Black-box, multi-agent AI red-teaming accelerator for generative-AI systems.**
 
@@ -605,8 +611,7 @@ output/                   # generated reports (.html) + traces (.trace.jsonl)
 
 ## License & responsible use
 
-MIT © Nikita Litovchenko, Luca Medea, Lorenzo Albani, Riccardo Ponte, Changchen Yu, Alp
-Bayrak. See [pyproject.toml](backend/pyproject.toml).
+MIT © Nikita Litovchenko, Luca Medea, Lorenzo Albani, Riccardo Ponte, Changchen Yu, Alp Bayrak. See [pyproject.toml](backend/pyproject.toml).
 
 > **Use responsibly.** TRIDENT is an offensive-security tool. Only run it against systems
 > you own or are explicitly authorized to test, and keep every campaign inside the
